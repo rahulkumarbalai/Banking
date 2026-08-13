@@ -98,7 +98,7 @@ export const Dashboard: React.FC = () => {
                     <ListItemAvatar>
                       <Avatar sx={{ bgcolor: 'primary.light' }}>{user.name.charAt(0)}</Avatar>
                     </ListItemAvatar>
-                    <ListItemText primary={user.name} secondary={`Shares: ₹${user.shares.toLocaleString()}`} />
+                    <ListItemText primary={user.name} secondary={`Shares: ₹${user.totalDeposited.toLocaleString()}`} />
                   </ListItem>
                 ))}
                 {users.length === 0 && (
