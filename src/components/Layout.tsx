@@ -46,7 +46,7 @@ export const Layout: React.FC = () => {
   const drawer = (
     <div>
       <Toolbar>
-        <Typography variant="h6" noWrap component="div" color="primary" fontWeight="bold">
+        <Typography variant="h6" noWrap component="div" color="primary" sx={{ fontWeight: 'bold' }}>
           NEON BANK
         </Typography>
       </Toolbar>
@@ -167,7 +167,7 @@ export const Layout: React.FC = () => {
           <BottomNavigation
             showLabels
             value={location.pathname === '/' ? 0 : location.pathname.startsWith('/users') ? 1 : location.pathname === '/add-user' ? 2 : 3}
-            onChange={(event, newValue) => {
+            onChange={(_, newValue) => {
               navigate(navItems[newValue].path);
             }}
           >

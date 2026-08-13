@@ -16,7 +16,7 @@ export const UsersList: React.FC = () => {
 
   return (
     <Box sx={{ pb: 2, maxWidth: 800, mx: 'auto' }}>
-      <Typography variant="h4" sx={{ mb: 3 }} fontWeight="bold">Members Directory</Typography>
+      <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>Members Directory</Typography>
       
       <Card>
         <CardContent sx={{ p: 0 }}>
@@ -39,7 +39,7 @@ export const UsersList: React.FC = () => {
                   </Avatar>
                 </ListItemAvatar>
                 <ListItemText 
-                  primary={<Typography variant="h6" fontWeight="bold" color="text.primary">{user.name}</Typography>} 
+                  primary={<Typography variant="h6" sx={{ fontWeight: 'bold' }} color="text.primary">{user.name}</Typography>} 
                   secondary={
                     <Typography component="span" variant="body2" color="text.secondary">
                       Deposits: ₹{user.totalDeposited.toLocaleString()}

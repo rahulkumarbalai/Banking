@@ -34,7 +34,7 @@ export const AddUser: React.FC = () => {
 
   return (
     <Box sx={{ maxWidth: 500, margin: '0 auto', pb: 4 }}>
-      <Typography variant="h4" sx={{ mb: 4, textAlign: 'center' }} fontWeight="bold">Add New Member</Typography>
+      <Typography variant="h4" sx={{ mb: 4, textAlign: 'center', fontWeight: 'bold' }}>Add New Member</Typography>
       
       <Card>
         <CardContent sx={{ p: 4 }}>

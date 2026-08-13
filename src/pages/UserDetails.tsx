@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Typography, Box, Button, Card, CardContent, Divider, Dialog, DialogTitle, DialogContent, DialogActions, TextField, List, ListItem, ListItemText, Grid, Avatar } from '@mui/material';
+import { Typography, Box, Button, Card, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, TextField, List, ListItem, ListItemText, Grid, Avatar } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/store';
 import type { User, Transaction } from '../services/types';
@@ -84,25 +84,25 @@ export const UserDetails: React.FC = () => {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 4 }}>
         <Avatar sx={{ width: 80, height: 80, bgcolor: 'primary.main', fontSize: '2rem' }}>{user.name.charAt(0)}</Avatar>
         <Box>
-          <Typography variant="h3" fontWeight="bold">{user.name}</Typography>
+          <Typography variant="h3" sx={{ fontWeight: 'bold' }}>{user.name}</Typography>
           <Typography variant="subtitle1" color="text.secondary">Monthly Share Commitment: ₹{user.monthlyShareAmount}</Typography>
         </Box>
       </Box>
       
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6}>
+        <Grid size={{ xs: 12, sm: 6 }}>
           <Card sx={{ height: '100%', bgcolor: 'primary.50' }}>
             <CardContent>
               <Typography color="text.secondary" gutterBottom>Total Deposited Shares</Typography>
-              <Typography variant="h4" color="primary.main" fontWeight="bold">₹{user.totalDeposited.toLocaleString()}</Typography>
+              <Typography variant="h4" color="primary.main" sx={{ fontWeight: 'bold' }}>₹{user.totalDeposited.toLocaleString()}</Typography>
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6}>
+        <Grid size={{ xs: 12, sm: 6 }}>
           <Card sx={{ height: '100%', bgcolor: 'error.50' }}>
             <CardContent>
               <Typography color="text.secondary" gutterBottom>Total Borrowed (Active Loan)</Typography>
-              <Typography variant="h4" color="error.main" fontWeight="bold">₹{user.totalLent.toLocaleString()}</Typography>
+              <Typography variant="h4" color="error.main" sx={{ fontWeight: 'bold' }}>₹{user.totalLent.toLocaleString()}</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -112,33 +112,33 @@ export const UserDetails: React.FC = () => {
         <CardContent>
           <Typography variant="h6" gutterBottom>Quick Actions</Typography>
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <Button fullWidth variant="contained" size="large" onClick={() => setOpenShare(true)} startIcon={<PaymentIcon />}>Pay Share</Button>
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <Button fullWidth variant="outlined" color="secondary" size="large" onClick={() => setOpenBorrow(true)} startIcon={<RequestQuoteIcon />}>Borrow</Button>
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid size={{ xs: 12, sm: 4 }}>
               <Button fullWidth variant="outlined" disabled={user.totalLent <= 0} onClick={() => setOpenRepay(true)} startIcon={<MoneyIcon />}>Repay Loan</Button>
             </Grid>
           </Grid>
         </CardContent>
       </Card>
 
-      <Typography variant="h5" sx={{ mb: 2 }} fontWeight="bold">Transaction History</Typography>
+      <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>Transaction History</Typography>
       <Card>
         <List sx={{ p: 0 }}>
           {transactions.map((t, index) => (
             <ListItem key={t.id} divider={index !== transactions.length - 1} sx={{ py: 2 }}>
               <ListItemText 
                 primary={
-                  <Typography variant="subtitle1" fontWeight="bold" sx={{ textTransform: 'capitalize' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold', textTransform: 'capitalize' }}>
                     {t.type}
                   </Typography>
                 } 
                 secondary={new Date(t.date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} 
               />
-              <Typography variant="h6" fontWeight="bold" color={t.type === 'borrow' ? 'error.main' : 'primary.main'}>
+              <Typography variant="h6" color={t.type === 'borrow' ? 'error.main' : 'primary.main'} sx={{ fontWeight: 'bold' }}>
                 {t.type === 'borrow' ? '-' : '+'}₹{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </Typography>
             </ListItem>

@@ -42,13 +42,13 @@ export const Dashboard: React.FC = () => {
       <Grid container spacing={3}>
         
         {/* Total Lending Pool */}
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', bgcolor: 'primary.main', color: 'primary.contrastText' }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>
                 Total Lending Pool
               </Typography>
-              <Typography variant="h3" component="div" fontWeight="bold">
+              <Typography variant="h3" component="div" sx={{ fontWeight: 'bold' }}>
                 ₹{globalState.totalLendingPool.toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </Typography>
               <Typography variant="body2" sx={{ mt: 2, opacity: 0.8 }}>
@@ -59,9 +59,9 @@ export const Dashboard: React.FC = () => {
         </Grid>
 
         {/* Quick Actions */}
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <Grid container spacing={2} sx={{ height: '100%' }}>
-            <Grid item xs={6} md={12}>
+            <Grid size={{ xs: 6, md: 12 }}>
               <Card sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
                 <CardContent sx={{ flex: 1, textAlign: 'center' }}>
                   <Button component={Link} to="/users" variant="text" size="large" fullWidth sx={{ py: 2, flexDirection: 'column' }}>
@@ -71,7 +71,7 @@ export const Dashboard: React.FC = () => {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={6} md={12}>
+            <Grid size={{ xs: 6, md: 12 }}>
               <Card sx={{ height: '100%', display: 'flex', alignItems: 'center' }}>
                 <CardContent sx={{ flex: 1, textAlign: 'center' }}>
                   <Button component={Link} to="/settings" variant="text" size="large" fullWidth color="secondary" sx={{ py: 2, flexDirection: 'column' }}>
@@ -85,7 +85,7 @@ export const Dashboard: React.FC = () => {
         </Grid>
 
         {/* Top Members */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Card sx={{ height: '100%' }}>
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -112,7 +112,7 @@ export const Dashboard: React.FC = () => {
         </Grid>
 
         {/* Recent Transactions */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Card sx={{ height: '100%' }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>Recent Activity</Typography>
@@ -129,7 +129,7 @@ export const Dashboard: React.FC = () => {
                         primary={<Typography sx={{ textTransform: 'capitalize' }}>{t.type}</Typography>} 
                         secondary={new Date(t.date).toLocaleDateString()} 
                       />
-                      <Typography variant="body1" fontWeight="bold" color={t.type === 'borrow' ? 'error.main' : 'success.main'}>
+                      <Typography variant="body1" sx={{ fontWeight: 'bold' }} color={t.type === 'borrow' ? 'error.main' : 'success.main'}>
                         {t.type === 'borrow' ? '-' : '+'}₹{t.amount.toLocaleString()}
                       </Typography>
                     </ListItem>
