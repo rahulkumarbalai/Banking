@@ -1,5 +1,13 @@
 # React + TypeScript + Vite
 
+## English and Marathi
+
+Use the **मराठी / English** button in the top navigation to switch languages on desktop or mobile. The app remembers the choice in `localStorage` under `banking-language`. On first use, a Marathi browser preference selects Marathi; other browser languages default to English.
+
+Translations live in `src/i18n/messages.ts`. Use `useLanguage().tr()` for interface text and named placeholders for complete sentences. The language provider updates the HTML language, dates, and amount formatting without resetting page or form state. Amounts retain Latin digits and Indian grouping. Known system-generated ledger descriptions are translated for display; stored banking records, member names, and custom notes are preserved. CSV exports follow the selected language.
+
+Run `npm test` for translation, interpolation, preference, and ledger-description checks, `npm run lint` for linting, and `npm run build` for the production build.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:

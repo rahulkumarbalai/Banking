@@ -1,11 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
 import { LANGUAGE_STORAGE_KEY, resolveLanguage, translate, translateError, transactionLabel, describeTransaction } from './core';
 import type { Transaction } from '../services/types';
 import type { Language, MessageValues } from './core';
 import type { MessageKey } from './messages';
 
-function useLanguageState() {
+export function useLanguageState() {
   const [language, setLanguage] = useState<Language>(() => {
     let saved: string | null = null;
     try { saved = localStorage.getItem(LANGUAGE_STORAGE_KEY); } catch { /* Storage may be disabled. */ }
@@ -44,12 +43,7 @@ function useLanguageState() {
   }, [language]);
 }
 
-const LanguageContext = createContext<ReturnType<typeof useLanguageState> | null>(null);
-
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const value = useLanguageState();
-  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
-}
+export const LanguageContext = createContext<ReturnType<typeof useLanguageState> | null>(null);
 
 export function useLanguage() {
   const context = useContext(LanguageContext);
