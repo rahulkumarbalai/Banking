@@ -20,6 +20,14 @@
     overflow-x: hidden;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
+
+  /* Use installed Devanagari fonts without requiring an external font request. */
+  html[lang='mr'] body,
+  html[lang='mr'] .font-sans,
+  html[lang='mr'] .font-mono {
+    font-family: 'Nirmala UI', 'Noto Sans Devanagari', 'Mangal', sans-serif;
+    letter-spacing: normal;
+  }
 }
 
 @layer utilities {

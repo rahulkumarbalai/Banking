@@ -19,6 +19,8 @@ export interface Loan {
   outstandingPrincipal: number; // remaining principal
   interestRatePercent: number; // per-loan interest rate (set at borrow time)
   totalInterestPaid: number; // interest paid so far on this loan
+  outstandingInterest: number; // accumulated interest not yet paid
+  lastInterestAppliedDate?: string; // date when interest was last calculated
   date: string; // date loan was issued
   status: 'active' | 'closed';
 }

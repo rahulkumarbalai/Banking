@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n/LanguageContext';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, store } from '../services/store';
@@ -19,9 +20,9 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import PersonIcon from '@mui/icons-material/Person';
 import CategoryIcon from '@mui/icons-material/Category';
 
-const fmt = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const Transactions: React.FC = () => {
+  const { tr, fmt, formatDate, locale, transactionLabel, describeTransaction } = useLanguage();
   const navigate = useNavigate();
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -67,7 +68,7 @@ export const Transactions: React.FC = () => {
         // User Search / Name Search
         const user = users.find((u) => u.id === t.userId);
         const userName = user?.name.toLowerCase() || '';
-        const desc = (t.description || '').toLowerCase();
+        const desc = `${t.description || ''} ${describeTransaction(t.description || '')}`.toLowerCase();
         const searchLower = search.toLowerCase();
         const matchesSearch = userName.includes(searchLower) || desc.includes(searchLower) || t.id.includes(searchLower);
 
@@ -99,7 +100,7 @@ export const Transactions: React.FC = () => {
         }
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       });
-  }, [allTransactions, users, search, selectedUser, selectedType, selectedMonth, sortOrder]);
+  }, [allTransactions, users, search, selectedUser, selectedType, selectedMonth, sortOrder, describeTransaction]);
 
   // Calculated Metrics for Filtered Set
   const filteredSummary = useMemo(() => {
@@ -131,19 +132,19 @@ export const Transactions: React.FC = () => {
   const getTxBadge = (type: Transaction['type']) => {
     switch (type) {
       case 'deposit':
-        return { label: 'Share Deposit', bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: <ArrowDownwardIcon className="w-4 h-4" /> };
+        return { label: tr("Share Deposit"), bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: <ArrowDownwardIcon className="w-4 h-4" /> };
       case 'borrow':
-        return { label: 'Loan Disbursed', bg: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: <ArrowUpwardIcon className="w-4 h-4" /> };
+        return { label: tr("Loan Disbursed"), bg: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: <ArrowUpwardIcon className="w-4 h-4" /> };
       case 'repay_full':
-        return { label: 'Full Repayment', bg: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: <PaymentsIcon className="w-4 h-4" /> };
+        return { label: tr("Full Repayment"), bg: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: <PaymentsIcon className="w-4 h-4" /> };
       case 'repay_partial':
-        return { label: 'Partial Repayment', bg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', icon: <PaymentsIcon className="w-4 h-4" /> };
+        return { label: tr("Partial Repayment"), bg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', icon: <PaymentsIcon className="w-4 h-4" /> };
       case 'interest_only':
-        return { label: 'Interest Only', bg: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: <PercentIcon className="w-4 h-4" /> };
+        return { label: tr("Interest Only"), bg: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: <PercentIcon className="w-4 h-4" /> };
       case 'withdraw':
-        return { label: 'Share Withdrawal', bg: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: <CallReceivedIcon className="w-4 h-4" /> };
+        return { label: tr("Share Withdrawal"), bg: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: <CallReceivedIcon className="w-4 h-4" /> };
       case 'interest_distribution':
-        return { label: 'Interest Distribution', bg: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20', icon: <StarIcon className="w-4 h-4" /> };
+        return { label: tr("Interest Distribution"), bg: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20', icon: <StarIcon className="w-4 h-4" /> };
       default:
         return { label: type, bg: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: <AccountBalanceIcon className="w-4 h-4" /> };
     }
@@ -162,30 +163,31 @@ export const Transactions: React.FC = () => {
   const handleExportCSV = () => {
     if (filteredTransactions.length === 0) return;
 
-    const headers = ['Transaction ID', 'Date & Time', 'Member Name', 'Member Type', 'Action Type', 'Amount (INR)', 'Principal Paid', 'Interest Paid', 'Description'];
+    const headers = [tr("Transaction ID"), tr("Date & Time"), tr("Member Name"), tr("Member Type"), tr("Action Type"), tr("Amount (INR)"), tr("Principal Paid"), tr("Interest Paid"), tr("Description")];
     const rows = filteredTransactions.map((t) => {
       const u = users.find((usr) => usr.id === t.userId);
       return [
         escapeCSV(t.id),
-        escapeCSV(t.date ? new Date(t.date).toLocaleString('en-IN') : ''),
-        escapeCSV(u?.name || 'Unknown'),
-        escapeCSV(u?.memberType || ''),
-        escapeCSV(t.type),
+        escapeCSV(t.date ? new Date(t.date).toLocaleString(locale) : ''),
+        escapeCSV(u?.name || tr("Unknown")),
+        escapeCSV(u ? tr(u.memberType === 'share' ? 'Share Member' : 'Borrower Only') : ''),
+        escapeCSV(transactionLabel(t.type)),
         t.amount,
         t.principalPaid || 0,
         t.interestPaid || 0,
-        escapeCSV(t.description || ''),
+        escapeCSV(describeTransaction(t.description || '')),
       ];
     });
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = '\uFEFF' + [headers.map(escapeCSV).join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }));
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
     link.setAttribute('download', `patil_bank_fund_ledger_${format(new Date(), 'yyyy-MM-dd')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(encodedUri), 1000);
   };
 
   const resetAllFilters = () => {
@@ -201,12 +203,8 @@ export const Transactions: React.FC = () => {
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            Fund Audit Ledger
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Complete transaction history with multi-criteria filtering, monthly aggregation & export tools.
-          </p>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">{tr("Fund Audit Ledger")}</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{tr("Complete transaction history with multi-criteria filtering, monthly aggregation & export tools.")}</p>
         </div>
 
         <button
@@ -219,42 +217,42 @@ export const Transactions: React.FC = () => {
           }`}
         >
           <DownloadIcon className="w-4 h-4" />
-          <span>Export CSV ({filteredTransactions.length})</span>
+          <span>{tr("Export CSV ({count})", { count: filteredTransactions.length })}</span>
         </button>
       </div>
 
       {/* FILTERED SUMMARY STATS CARDS */}
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card rounded-3xl p-5">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Filtered Entries</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Filtered Entries")}</p>
           <p className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 dark:text-white mt-1">
             {filteredSummary.totalCount}
           </p>
-          <p className="text-[11px] text-slate-400 mt-0.5">out of {allTransactions.length} total logs</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">{tr("out of {count} total logs", { count: allTransactions.length })}</p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card rounded-3xl p-5">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Inflow</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Total Inflow")}</p>
           <p className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-400 mt-1">
             ₹{fmt(filteredSummary.inflow)}
           </p>
-          <p className="text-[11px] text-slate-400 mt-0.5">Deposits & Repayments</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">{tr("Deposits & Repayments")}</p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card rounded-3xl p-5">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Outflow</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Total Outflow")}</p>
           <p className="text-2xl sm:text-3xl font-extrabold font-mono text-rose-400 mt-1">
             ₹{fmt(filteredSummary.outflow)}
           </p>
-          <p className="text-[11px] text-slate-400 mt-0.5">Loans & Withdrawals</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">{tr("Loans & Withdrawals")}</p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass-card rounded-3xl p-5">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Interest Collected</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Interest Collected")}</p>
           <p className="text-2xl sm:text-3xl font-extrabold font-mono text-purple-400 mt-1">
             ₹{fmt(filteredSummary.interestCollected)}
           </p>
-          <p className="text-[11px] text-slate-400 mt-0.5">in selected range</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">{tr("in selected range")}</p>
         </motion.div>
       </section>
 
@@ -263,7 +261,7 @@ export const Transactions: React.FC = () => {
         <div className="flex items-center justify-between pb-3 border-b border-slate-700/30 dark:border-white/10">
           <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-bold text-base">
             <FilterListIcon className="w-5 h-5 text-blue-400" />
-            <span>Ledger Filters & Controls</span>
+            <span>{tr("Ledger Filters & Controls")}</span>
           </div>
 
           {(search || selectedUser !== 'all' || selectedType !== 'all' || selectedMonth !== 'all' || sortOrder !== 'newest') && (
@@ -272,7 +270,7 @@ export const Transactions: React.FC = () => {
               className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center space-x-1 transition-colors"
             >
               <RestartAltIcon className="w-4 h-4" />
-              <span>Reset Filters</span>
+              <span>{tr("Reset Filters")}</span>
             </button>
           )}
         </div>
@@ -281,13 +279,11 @@ export const Transactions: React.FC = () => {
           {/* 1. User / Description Search */}
           <div>
             <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-              <SearchIcon className="w-3.5 h-3.5" />
-              Search Query
-            </label>
+              <SearchIcon className="w-3.5 h-3.5" />{tr("Search Query")}</label>
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search member, description..."
+                placeholder={tr("Search member, description...")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs"
@@ -298,19 +294,17 @@ export const Transactions: React.FC = () => {
           {/* 2. Monthly Filter Dropdown */}
           <div>
             <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-              <CalendarMonthIcon className="w-3.5 h-3.5 text-indigo-400" />
-              Filter by Month
-            </label>
+              <CalendarMonthIcon className="w-3.5 h-3.5 text-indigo-400" />{tr("Filter by Month")}</label>
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs"
             >
-              <option value="all" className="bg-slate-900 text-white">All Months</option>
+              <option value="all" className="bg-slate-900 text-white">{tr("All Months")}</option>
               {availableMonths.map((m) => {
                 let monthLabel = m;
                 try {
-                  monthLabel = format(parseISO(`${m}-01`), 'MMMM yyyy');
+                  monthLabel = formatDate(parseISO(`${m}-01`), { month: 'long', year: 'numeric' });
                 } catch {
                   // fallback
                 }
@@ -326,18 +320,16 @@ export const Transactions: React.FC = () => {
           {/* 3. Member Filter Dropdown */}
           <div>
             <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-              <PersonIcon className="w-3.5 h-3.5 text-emerald-400" />
-              Filter by Member
-            </label>
+              <PersonIcon className="w-3.5 h-3.5 text-emerald-400" />{tr("Filter by Member")}</label>
             <select
               value={selectedUser}
               onChange={(e) => setSelectedUser(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs"
             >
-              <option value="all" className="bg-slate-900 text-white">All Members ({users.length})</option>
+              <option value="all" className="bg-slate-900 text-white">{tr("All Members ({count})", { count: users.length })}</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id} className="bg-slate-900 text-white">
-                  {u.name} ({u.memberType === 'share' ? 'Share' : 'Borrower'})
+                  {u.name} ({u.memberType === 'share' ? tr("Share") : tr("Borrower")})
                 </option>
               ))}
             </select>
@@ -346,39 +338,37 @@ export const Transactions: React.FC = () => {
           {/* 4. Action Type Filter */}
           <div>
             <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-              <CategoryIcon className="w-3.5 h-3.5 text-amber-400" />
-              Action Type
-            </label>
+              <CategoryIcon className="w-3.5 h-3.5 text-amber-400" />{tr("Action Type")}</label>
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs"
             >
-              <option value="all" className="bg-slate-900 text-white">All Action Types</option>
-              <option value="deposit" className="bg-slate-900 text-white">Share Deposit</option>
-              <option value="borrow" className="bg-slate-900 text-white">Loan Disbursed</option>
-              <option value="repay_full" className="bg-slate-900 text-white">Full Repayment</option>
-              <option value="repay_partial" className="bg-slate-900 text-white">Partial Repayment</option>
-              <option value="interest_only" className="bg-slate-900 text-white">Interest Only Payment</option>
-              <option value="withdraw" className="bg-slate-900 text-white">Share Withdrawal</option>
-              <option value="interest_distribution" className="bg-slate-900 text-white">Interest Distribution</option>
+              <option value="all" className="bg-slate-900 text-white">{tr("All Action Types")}</option>
+              <option value="deposit" className="bg-slate-900 text-white">{tr("Share Deposit")}</option>
+              <option value="borrow" className="bg-slate-900 text-white">{tr("Loan Disbursed")}</option>
+              <option value="repay_full" className="bg-slate-900 text-white">{tr("Full Repayment")}</option>
+              <option value="repay_partial" className="bg-slate-900 text-white">{tr("Partial Repayment")}</option>
+              <option value="interest_only" className="bg-slate-900 text-white">{tr("Interest Only Payment")}</option>
+              <option value="withdraw" className="bg-slate-900 text-white">{tr("Share Withdrawal")}</option>
+              <option value="interest_distribution" className="bg-slate-900 text-white">{tr("Interest Distribution")}</option>
             </select>
           </div>
         </div>
 
         {/* Sort Bar */}
         <div className="flex items-center justify-between pt-2 text-xs text-slate-400">
-          <span>Showing <strong className="text-slate-200">{filteredTransactions.length}</strong> transaction logs</span>
+          <span>{tr("Showing {count} transaction logs", { count: filteredTransactions.length })}</span>
           <div className="flex items-center space-x-2">
-            <span>Sort by:</span>
+            <span>{tr("Sort by:")}</span>
             <select
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as any)}
               className="bg-transparent border border-white/10 text-slate-200 rounded-xl px-2.5 py-1 text-xs focus:outline-none"
             >
-              <option value="newest" className="bg-slate-900 text-white">Newest First</option>
-              <option value="oldest" className="bg-slate-900 text-white">Oldest First</option>
-              <option value="amount_desc" className="bg-slate-900 text-white">Highest Amount</option>
+              <option value="newest" className="bg-slate-900 text-white">{tr("Newest First")}</option>
+              <option value="oldest" className="bg-slate-900 text-white">{tr("Oldest First")}</option>
+              <option value="amount_desc" className="bg-slate-900 text-white">{tr("Highest Amount")}</option>
             </select>
           </div>
         </div>
@@ -391,12 +381,12 @@ export const Transactions: React.FC = () => {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-white/10 text-slate-400 uppercase tracking-wider">
-                <th className="py-3 px-3">Date & Time</th>
-                <th className="py-3 px-3">Member</th>
-                <th className="py-3 px-3">Action Type</th>
-                <th className="py-3 px-3">Description</th>
-                <th className="py-3 px-3 text-right">Principal / Interest</th>
-                <th className="py-3 px-3 text-right">Amount</th>
+                <th className="py-3 px-3">{tr("Date & Time")}</th>
+                <th className="py-3 px-3">{tr("Member")}</th>
+                <th className="py-3 px-3">{tr("Action Type")}</th>
+                <th className="py-3 px-3">{tr("Description")}</th>
+                <th className="py-3 px-3 text-right">{tr("Principal / Interest")}</th>
+                <th className="py-3 px-3 text-right">{tr("Amount")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 font-mono">
@@ -415,7 +405,7 @@ export const Transactions: React.FC = () => {
                       className="hover:bg-white/5 transition-colors font-sans"
                     >
                       <td className="py-3.5 px-3 font-mono text-[11px] text-slate-400">
-                        {t.date ? format(parseISO(t.date), 'dd MMM yyyy, hh:mm a') : 'N/A'}
+                        {t.date ? formatDate(t.date, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : tr("N/A")}
                       </td>
                       <td className="py-3.5 px-3">
                         <button
@@ -425,7 +415,7 @@ export const Transactions: React.FC = () => {
                           <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-300 flex items-center justify-center text-[10px] font-bold">
                             {user?.name.charAt(0) || 'U'}
                           </div>
-                          <span>{user?.name || 'Unknown Member'}</span>
+                          <span>{user?.name || tr("Unknown Member")}</span>
                         </button>
                       </td>
                       <td className="py-3.5 px-3">
@@ -435,13 +425,13 @@ export const Transactions: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-3.5 px-3 text-slate-300 max-w-xs truncate text-xs">
-                        {t.description}
+                        {describeTransaction(t.description)}
                       </td>
                       <td className="py-3.5 px-3 text-right font-mono text-[11px] text-slate-400">
                         {t.principalPaid !== undefined || t.interestPaid !== undefined ? (
                           <div>
-                            {t.principalPaid ? <span className="text-slate-300">P: ₹{fmt(t.principalPaid)}</span> : null}
-                            {t.interestPaid ? <span className="text-purple-400 ml-1">I: ₹{fmt(t.interestPaid)}</span> : null}
+                            {t.principalPaid ? <span className="text-slate-300">{tr("P: ₹")}{fmt(t.principalPaid)}</span> : null}
+                            {t.interestPaid ? <span className="text-purple-400 ml-1">{tr("I: ₹")}{fmt(t.interestPaid)}</span> : null}
                           </div>
                         ) : (
                           '—'
@@ -480,14 +470,14 @@ export const Transactions: React.FC = () => {
                     <span>{badge.label}</span>
                   </span>
                   <span className="font-mono text-xs text-slate-400">
-                    {t.date ? format(parseISO(t.date), 'dd MMM, hh:mm a') : ''}
+                    {t.date ? formatDate(t.date, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-bold text-sm text-slate-100">{user?.name || 'Unknown'}</p>
-                    <p className="text-xs text-slate-400">{t.description}</p>
+                    <p className="font-bold text-sm text-slate-100">{user?.name || tr("Unknown")}</p>
+                    <p className="text-xs text-slate-400">{describeTransaction(t.description)}</p>
                   </div>
                   <p className={`font-mono text-base font-bold ${isNegative ? 'text-rose-400' : 'text-emerald-400'}`}>
                     {isNegative ? '-' : '+'}₹{fmt(t.amount)}
@@ -501,13 +491,11 @@ export const Transactions: React.FC = () => {
         {filteredTransactions.length === 0 && (
           <div className="text-center py-12 text-slate-400 space-y-2">
             <FilterListIcon className="w-10 h-10 text-slate-500 mx-auto" />
-            <p className="text-base font-medium">No transactions match your active filters.</p>
+            <p className="text-base font-medium">{tr("No transactions match your active filters.")}</p>
             <button
               onClick={resetAllFilters}
               className="text-xs text-blue-400 hover:underline font-semibold"
-            >
-              Clear all filters
-            </button>
+            >{tr("Clear all filters")}</button>
           </div>
         )}
       </section>

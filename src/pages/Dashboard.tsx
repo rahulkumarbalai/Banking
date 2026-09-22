@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n/LanguageContext';
 import React, { useEffect, useState } from 'react';
 import { api, store } from '../services/store';
 import type { GlobalState, Transaction, User } from '../services/types';
@@ -15,9 +16,9 @@ import StarIcon from '@mui/icons-material/Star';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 
-const fmt = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const Dashboard: React.FC = () => {
+  const { tr, fmt, formatDate, transactionLabel, describeTransaction } = useLanguage();
   const navigate = useNavigate();
   const [globalState, setGlobalState] = useState<GlobalState>({
     totalLendingPool: 0,
@@ -73,12 +74,8 @@ export const Dashboard: React.FC = () => {
       {/* Hero / Quick Header Banner */}
       <section className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            Cooperative Financial Vault
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Real-time liquidity, interest distribution pool & member equity metrics.
-          </p>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">{tr("Cooperative Financial Vault")}</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{tr("Real-time liquidity, interest distribution pool & member equity metrics.")}</p>
         </div>
 
         {/* Quick Actions Bar */}
@@ -88,14 +85,14 @@ export const Dashboard: React.FC = () => {
             className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-xs sm:text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-200"
           >
             <PersonAddIcon className="w-4 h-4" />
-            <span>Add Member</span>
+            <span>{tr("Add Member")}</span>
           </button>
           <button
             onClick={() => navigate('/users')}
             className="flex items-center space-x-2 px-4 py-2.5 rounded-2xl glass-panel text-slate-800 dark:text-slate-200 hover:text-blue-400 font-medium text-xs sm:text-sm transition-all duration-200"
           >
             <GroupsIcon className="w-4 h-4" />
-            <span>View All</span>
+            <span>{tr("View All")}</span>
           </button>
         </div>
       </section>
@@ -110,9 +107,7 @@ export const Dashboard: React.FC = () => {
           className="glass-card rounded-3xl p-6 flex flex-col justify-between"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Lending Pool
-            </span>
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Lending Pool")}</span>
             <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
               <AccountBalanceWalletIcon className="w-5 h-5" />
             </div>
@@ -122,9 +117,9 @@ export const Dashboard: React.FC = () => {
               ₹{fmt(globalState.totalLendingPool)}
             </div>
             <div className="text-[11px] text-slate-400 font-mono mt-1 flex items-center gap-2">
-              <span>Shares: ₹{fmt(totalShareDeposits)}</span>
+              <span>{tr("Shares: ₹")}{fmt(totalShareDeposits)}</span>
               <span>•</span>
-              <span className="text-amber-400">Lent: ₹{fmt(totalLentOut)}</span>
+              <span className="text-amber-400">{tr("Lent: ₹")}{fmt(totalLentOut)}</span>
             </div>
           </div>
         </motion.div>
@@ -137,9 +132,7 @@ export const Dashboard: React.FC = () => {
           className="glass-card rounded-3xl p-6 flex flex-col justify-between"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Interest Pool
-            </span>
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Interest Pool")}</span>
             <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
               <TrendingUpIcon className="w-5 h-5" />
             </div>
@@ -148,8 +141,7 @@ export const Dashboard: React.FC = () => {
             <div className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-400 glow-emerald">
               ₹{fmt(globalState.totalInterestCollected)}
             </div>
-            <div className="text-[11px] text-slate-400 mt-1">
-              Distributed: ₹{fmt(globalState.totalInterestDistributed)}
+            <div className="text-[11px] text-slate-400 mt-1">{tr("Distributed: ₹")}{fmt(globalState.totalInterestDistributed)}
             </div>
           </div>
         </motion.div>
@@ -162,9 +154,7 @@ export const Dashboard: React.FC = () => {
           className="glass-card rounded-3xl p-6 flex flex-col justify-between"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Active Loans
-            </span>
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Active Loans")}</span>
             <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
               <DescriptionIcon className="w-5 h-5" />
             </div>
@@ -173,8 +163,7 @@ export const Dashboard: React.FC = () => {
             <div className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 dark:text-white">
               {activeLoans.length}
             </div>
-            <div className="text-[11px] text-amber-400 font-mono mt-1">
-              Total Principal: ₹{fmt(totalLentOut)}
+            <div className="text-[11px] text-amber-400 font-mono mt-1">{tr("Total Principal: ₹")}{fmt(totalLentOut)}
             </div>
           </div>
         </motion.div>
@@ -187,9 +176,7 @@ export const Dashboard: React.FC = () => {
           className="glass-card rounded-3xl p-6 flex flex-col justify-between"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Total Members
-            </span>
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Total Members")}</span>
             <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
               <GroupsIcon className="w-5 h-5" />
             </div>
@@ -200,7 +187,7 @@ export const Dashboard: React.FC = () => {
                 {users.length}
               </div>
               <div className="text-[11px] text-slate-400 mt-1">
-                {shareMembers.length} Share • {borrowerMembers.length} Borrower
+                {tr("{shares} Share • {borrowers} Borrower", { shares: shareMembers.length, borrowers: borrowerMembers.length })}
               </div>
             </div>
           </div>
@@ -213,14 +200,10 @@ export const Dashboard: React.FC = () => {
         <section className="lg:col-span-2 glass-panel rounded-3xl p-6 md:p-7 space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-slate-700/30 dark:border-white/10">
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                Recent Audit Activity
-              </h3>
-              <p className="text-xs text-slate-400">Real-time ledger entries and logs</p>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{tr("Recent Audit Activity")}</h3>
+              <p className="text-xs text-slate-400">{tr("Real-time ledger entries and logs")}</p>
             </div>
-            <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Live System
-            </span>
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{tr("Live System")}</span>
           </div>
 
           <div className="space-y-3.5">
@@ -244,12 +227,12 @@ export const Dashboard: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 capitalize">
-                          {t.type.replace(/_/g, ' ')}
+                          {transactionLabel(t.type)}
                         </p>
                         <p className="text-xs text-slate-400 flex items-center gap-1.5">
-                          <span className="font-medium text-slate-300">{user?.name || 'Member'}</span>
+                          <span className="font-medium text-slate-300">{user?.name || tr("Member")}</span>
                           <span>•</span>
-                          <span>{t.description || new Date(t.date).toLocaleDateString()}</span>
+                          <span>{t.description ? describeTransaction(t.description) : formatDate(t.date)}</span>
                         </p>
                       </div>
                     </div>
@@ -263,7 +246,7 @@ export const Dashboard: React.FC = () => {
                         {txStyle.sign}₹{fmt(t.amount)}
                       </p>
                       <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                        {new Date(t.date).toLocaleDateString()}
+                        {formatDate(t.date)}
                       </p>
                     </div>
                   </motion.div>
@@ -271,9 +254,7 @@ export const Dashboard: React.FC = () => {
               })}
             </AnimatePresence>
             {transactions.length === 0 && (
-              <div className="text-center py-8 text-slate-400 text-sm">
-                No recent transaction logs.
-              </div>
+              <div className="text-center py-8 text-slate-400 text-sm">{tr("No recent transaction logs.")}</div>
             )}
           </div>
         </section>
@@ -283,16 +264,14 @@ export const Dashboard: React.FC = () => {
           <div>
             <div className="flex items-center justify-between pb-4 border-b border-slate-700/30 dark:border-white/10">
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Top Share Members
-                </h3>
-                <p className="text-xs text-slate-400">Equity distribution & share hold</p>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">{tr("Top Share Members")}</h3>
+                <p className="text-xs text-slate-400">{tr("Equity distribution & share hold")}</p>
               </div>
               <Link
                 to="/users"
                 className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-0.5 transition-colors"
               >
-                <span>View All</span>
+                <span>{tr("View All")}</span>
                 <ChevronRightIcon className="w-4 h-4" />
               </Link>
             </div>
@@ -329,7 +308,7 @@ export const Dashboard: React.FC = () => {
                           {user.name}
                         </p>
                         <p className="text-[11px] text-slate-400">
-                          {user.memberType === 'share' ? 'Share Member' : 'Loan Borrower'}
+                          {user.memberType === 'share' ? tr("Share Member") : tr("Loan Borrower")}
                         </p>
                       </div>
                     </div>
@@ -346,8 +325,7 @@ export const Dashboard: React.FC = () => {
                         </div>
                       ) : (
                         <div>
-                          <p className="text-xs font-mono font-bold text-amber-400">
-                            Owes ₹{fmt(user.totalLent)}
+                          <p className="text-xs font-mono font-bold text-amber-400">{tr("Owes ₹")}{fmt(user.totalLent)}
                           </p>
                         </div>
                       )}
@@ -356,19 +334,15 @@ export const Dashboard: React.FC = () => {
                 );
               })}
               {shareMembers.length === 0 && (
-                <div className="text-center py-6 text-slate-400 text-sm">
-                  No share members added yet.
-                </div>
+                <div className="text-center py-6 text-slate-400 text-sm">{tr("No share members added yet.")}</div>
               )}
             </div>
           </div>
 
           {/* Quick Notice Card */}
           <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-900/30 to-indigo-900/30 border border-blue-500/20 text-xs text-blue-300">
-            <p className="font-semibold text-blue-200">Year-End Distribution Rule:</p>
-            <p className="mt-1 text-slate-300 leading-relaxed text-[11px]">
-              Loan interest pool is distributed proportionally to share members based on equity % at end of period.
-            </p>
+            <p className="font-semibold text-blue-200">{tr("Year-End Distribution Rule:")}</p>
+            <p className="mt-1 text-slate-300 leading-relaxed text-[11px]">{tr("Loan interest pool is distributed proportionally to share members based on equity % at end of period.")}</p>
           </div>
         </section>
       </div>

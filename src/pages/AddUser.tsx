@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n/LanguageContext';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/store';
@@ -13,6 +14,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 export const AddUser: React.FC = () => {
+  const { tr, translateError } = useLanguage();
   const [name, setName] = useState('');
   const [mobile, setMobile] = useState('');
   const [memberType, setMemberType] = useState<MemberType>('share');
@@ -53,12 +55,8 @@ export const AddUser: React.FC = () => {
     <div className="max-w-xl mx-auto space-y-6">
       {/* Page Title */}
       <div className="text-center">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
-          Add New Cooperative Member
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Register share member (equity owner) or borrower-only member.
-        </p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">{tr("Add New Cooperative Member")}</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{tr("Register share member (equity owner) or borrower-only member.")}</p>
       </div>
 
       {/* Form Glass Panel */}
@@ -70,9 +68,7 @@ export const AddUser: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Member Type Selection Cards */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Member Category
-            </label>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{tr("Member Category")}</label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -89,8 +85,8 @@ export const AddUser: React.FC = () => {
                   }`}
                 />
                 <div>
-                  <p className="text-sm font-bold">Share Member</p>
-                  <p className="text-[11px] opacity-75 mt-0.5">Pays monthly share & earns interest</p>
+                  <p className="text-sm font-bold">{tr("Share Member")}</p>
+                  <p className="text-[11px] opacity-75 mt-0.5">{tr("Pays monthly share & earns interest")}</p>
                 </div>
               </button>
 
@@ -109,8 +105,8 @@ export const AddUser: React.FC = () => {
                   }`}
                 />
                 <div>
-                  <p className="text-sm font-bold">Borrower Only</p>
-                  <p className="text-[11px] opacity-75 mt-0.5">Borrows funds without share equity</p>
+                  <p className="text-sm font-bold">{tr("Borrower Only")}</p>
+                  <p className="text-[11px] opacity-75 mt-0.5">{tr("Borrows funds without share equity")}</p>
                 </div>
               </button>
             </div>
@@ -118,14 +114,12 @@ export const AddUser: React.FC = () => {
 
           {/* Full Name */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-              Full Name
-            </label>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">{tr("Full Name")}</label>
             <div className="relative">
               <PersonIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
                 type="text"
-                placeholder="e.g. Rahul Sharma"
+                placeholder={tr("e.g. Rahul Sharma")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-2xl glass-input text-sm"
@@ -135,14 +129,12 @@ export const AddUser: React.FC = () => {
 
           {/* Mobile Number */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-              Mobile Number
-            </label>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">{tr("Mobile Number")}</label>
             <div className="relative">
               <PhoneIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
                 type="tel"
-                placeholder="e.g. +91 9876543210"
+                placeholder={tr("e.g. +91 9876543210")}
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-2xl glass-input text-sm"
@@ -153,14 +145,12 @@ export const AddUser: React.FC = () => {
           {/* Monthly Share Amount (If Share Member) */}
           {memberType === 'share' && (
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-                Monthly Share Amount (₹)
-              </label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">{tr("Monthly Share Amount (₹)")}</label>
               <div className="relative">
                 <CurrencyRupeeIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="number"
-                  placeholder="e.g. 500"
+                  placeholder={tr("e.g. 500")}
                   value={monthlyShare}
                   onChange={(e) => setMonthlyShare(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 rounded-2xl glass-input font-mono text-sm"
@@ -173,16 +163,14 @@ export const AddUser: React.FC = () => {
           {memberType === 'borrower' && (
             <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 flex items-start space-x-2.5">
               <InfoIcon className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-              <span>
-                Borrower-only members do not deposit monthly share capital. All loans and repayments are logged under their account.
-              </span>
+              <span>{tr("Borrower-only members do not deposit monthly share capital. All loans and repayments are logged under their account.")}</span>
             </div>
           )}
 
           {/* Error Message */}
           {error && (
             <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
-              {error}
+              {translateError(error)}
             </div>
           )}
 
@@ -190,7 +178,7 @@ export const AddUser: React.FC = () => {
           {success && (
             <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium flex items-center space-x-2">
               <CheckCircleIcon className="w-4 h-4" />
-              <span>Member registered successfully! Redirecting...</span>
+              <span>{tr("Member registered successfully! Redirecting...")}</span>
             </div>
           )}
 
@@ -200,7 +188,7 @@ export const AddUser: React.FC = () => {
             className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500 hover:from-blue-500 hover:to-emerald-400 text-white font-bold text-sm shadow-xl shadow-blue-500/25 transition-all flex items-center justify-center space-x-2"
           >
             <PersonAddIcon className="w-5 h-5" />
-            <span>Create Member Account</span>
+            <span>{tr("Create Member Account")}</span>
           </button>
         </form>
       </motion.div>

@@ -22,9 +22,15 @@ const migrateData = (raw: unknown): AppData => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = raw as any;
 
-  // Ensure loans array exists (old schema didn't have it)
+  // Ensure loans array exists and has new fields
   if (!data.loans) {
     data.loans = [];
+  } else {
+    data.loans = data.loans.map((l: any) => ({
+      ...l,
+      outstandingInterest: l.outstandingInterest || 0,
+      lastInterestAppliedDate: l.lastInterestAppliedDate || l.date,
+    }));
   }
 
   // Migrate globalState fields
@@ -109,6 +115,25 @@ export const api = {
   // ---- Global State ----
   getGlobalState: (): GlobalState => {
     return getData().globalState;
+  },
+
+  applyMonthlyInterest: (): void => {
+    const data = getData();
+    const now = new Date().toISOString();
+    let updated = false;
+
+    for (const loan of data.loans) {
+      if (loan.status === 'active') {
+        const interest = loan.outstandingPrincipal * (loan.interestRatePercent / 100);
+        loan.outstandingInterest += interest;
+        loan.lastInterestAppliedDate = now;
+        updated = true;
+      }
+    }
+    
+    if (updated) {
+      saveData(data);
+    }
   },
 
   setDefaultInterestRate: (rate: number): GlobalState => {
@@ -205,6 +230,8 @@ export const api = {
     data.globalState.totalLendingPool -= amount;
     user.totalLent += amount;
 
+    const initialInterest = amount * (rate / 100);
+
     const loan: Loan = {
       id: uuidv4(),
       userId,
@@ -212,6 +239,8 @@ export const api = {
       outstandingPrincipal: amount,
       interestRatePercent: rate,
       totalInterestPaid: 0,
+      outstandingInterest: initialInterest,
+      lastInterestAppliedDate: new Date().toISOString(),
       date: new Date().toISOString(),
       status: 'active',
     };
@@ -245,7 +274,7 @@ export const api = {
     if (loan.status === 'closed') throw new Error('Loan is already closed');
 
     const principal = loan.outstandingPrincipal;
-    const interest = principal * (loan.interestRatePercent / 100);
+    const interest = loan.outstandingInterest;
     const totalPayment = principal + interest;
 
     // Update user
@@ -257,6 +286,7 @@ export const api = {
 
     // Close loan
     loan.outstandingPrincipal = 0;
+    loan.outstandingInterest = 0;
     loan.totalInterestPaid += interest;
     loan.status = 'closed';
 
@@ -278,10 +308,14 @@ export const api = {
   },
 
   // ---- Repayment: Partial ----
-  repayPartial: (userId: string, loanId: string, principalAmount: number): Transaction => {
-    if (!Number.isFinite(principalAmount) || principalAmount <= 0) {
+  repayPartial: (userId: string, loanId: string, principalAmount: number, payInterest: boolean): Transaction => {
+    if (!Number.isFinite(principalAmount) || principalAmount < 0) {
       throw new Error('Invalid repayment amount');
     }
+    if (principalAmount === 0 && !payInterest) {
+      throw new Error('Payment amount must be greater than 0');
+    }
+
     const data = getData();
     const userIndex = data.users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error('User not found');
@@ -293,19 +327,33 @@ export const api = {
     if (loan.status === 'closed') throw new Error('Loan is already closed');
     if (principalAmount > loan.outstandingPrincipal) throw new Error('Amount exceeds outstanding principal');
 
-    const interest = principalAmount * (loan.interestRatePercent / 100);
+    const interest = payInterest ? loan.outstandingInterest : 0;
     const totalPayment = principalAmount + interest;
+
+    if (totalPayment <= 0) {
+      throw new Error('Payment amount must be greater than 0');
+    }
 
     data.users[userIndex].totalLent -= principalAmount;
     data.globalState.totalLendingPool += principalAmount;
     data.globalState.totalInterestCollected += interest;
 
     loan.outstandingPrincipal -= principalAmount;
-    loan.totalInterestPaid += interest;
+    if (payInterest) {
+      loan.outstandingInterest = 0;
+      loan.totalInterestPaid += interest;
+    }
+
     if (loan.outstandingPrincipal <= 0) {
       loan.outstandingPrincipal = 0;
       loan.status = 'closed';
     }
+
+    let description = `Partial repayment — ₹${fmt(principalAmount)} principal`;
+    if (payInterest) {
+      description += ` + ₹${fmt(interest)} outstanding interest`;
+    }
+    description += `. Remaining Principal: ₹${fmt(loan.outstandingPrincipal)}`;
 
     const transaction: Transaction = {
       id: uuidv4(),
@@ -316,7 +364,7 @@ export const api = {
       principalPaid: principalAmount,
       interestPaid: interest,
       date: new Date().toISOString(),
-      description: `Partial repayment — ₹${fmt(principalAmount)} principal + ₹${fmt(interest)} interest (${loan.interestRatePercent}%). Remaining: ₹${fmt(loan.outstandingPrincipal)}`,
+      description,
     };
 
     data.transactions.push(transaction);
@@ -336,10 +384,12 @@ export const api = {
     const loan = data.loans[loanIndex];
     if (loan.status === 'closed') throw new Error('Loan is already closed');
 
-    const interest = loan.outstandingPrincipal * (loan.interestRatePercent / 100);
+    const interest = loan.outstandingInterest;
+    if (interest <= 0) throw new Error('No outstanding interest to pay');
 
     data.globalState.totalInterestCollected += interest;
     loan.totalInterestPaid += interest;
+    loan.outstandingInterest = 0;
 
     const transaction: Transaction = {
       id: uuidv4(),

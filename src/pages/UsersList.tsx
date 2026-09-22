@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n/LanguageContext';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/store';
@@ -10,9 +11,9 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import GroupsIcon from '@mui/icons-material/Groups';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 
-const fmt = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const UsersList: React.FC = () => {
+  const { tr, fmt } = useLanguage();
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'share' | 'borrower'>('all');
@@ -39,12 +40,8 @@ export const UsersList: React.FC = () => {
       {/* Header & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
-            Members Directory
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Manage share members, borrowers, equity distribution and loans.
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">{tr("Members Directory")}</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{tr("Manage share members, borrowers, equity distribution and loans.")}</p>
         </div>
 
         <button
@@ -52,7 +49,7 @@ export const UsersList: React.FC = () => {
           className="flex items-center justify-center space-x-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-sm shadow-lg shadow-blue-500/25 transition-all"
         >
           <PersonAddIcon className="w-5 h-5" />
-          <span>New Member</span>
+          <span>{tr("New Member")}</span>
         </button>
       </div>
 
@@ -63,7 +60,7 @@ export const UsersList: React.FC = () => {
           <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <input
             type="text"
-            placeholder="Search member by name or mobile..."
+            placeholder={tr("Search member by name or mobile...")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-2xl glass-input text-sm"
@@ -80,7 +77,7 @@ export const UsersList: React.FC = () => {
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            All ({users.length})
+            {tr("All ({count})", { count: users.length })}
           </button>
           <button
             onClick={() => setFilterType('share')}
@@ -90,7 +87,7 @@ export const UsersList: React.FC = () => {
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Share Members ({users.filter((u) => u.memberType === 'share').length})
+            {tr("Share Members ({count})", { count: users.filter((u) => u.memberType === 'share').length })}
           </button>
           <button
             onClick={() => setFilterType('borrower')}
@@ -100,7 +97,7 @@ export const UsersList: React.FC = () => {
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Borrowers Only ({users.filter((u) => u.memberType === 'borrower').length})
+            {tr("Borrowers Only ({count})", { count: users.filter((u) => u.memberType === 'borrower').length })}
           </button>
         </div>
       </div>
@@ -147,7 +144,7 @@ export const UsersList: React.FC = () => {
                           : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                       }`}
                     >
-                      {isShareMember ? 'Share Member' : 'Loan Borrower'}
+                      {isShareMember ? tr("Share Member") : tr("Loan Borrower")}
                     </span>
                   </div>
 
@@ -161,7 +158,7 @@ export const UsersList: React.FC = () => {
                     {isShareMember && (
                       <span className="flex items-center space-x-1">
                         <AccountBalanceIcon className="w-3.5 h-3.5" />
-                        <span>Equity: ₹{fmt(netEquity)}</span>
+                        <span>{tr("Equity: ₹")}{fmt(netEquity)}</span>
                       </span>
                     )}
                   </div>
@@ -173,12 +170,10 @@ export const UsersList: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   {isShareMember && sharePercent > 0 && (
                     <div className="px-3 py-1 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 font-mono text-xs font-semibold">
-                      {sharePercent.toFixed(1)}% Share
-                    </div>
+                      {sharePercent.toFixed(1)}{tr("% Share")}</div>
                   )}
                   {user.totalLent > 0 && (
-                    <div className="px-3 py-1 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 font-mono text-xs font-semibold">
-                      Owes ₹{fmt(user.totalLent)}
+                    <div className="px-3 py-1 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 font-mono text-xs font-semibold">{tr("Owes ₹")}{fmt(user.totalLent)}
                     </div>
                   )}
                 </div>
@@ -194,8 +189,8 @@ export const UsersList: React.FC = () => {
         {filteredUsers.length === 0 && (
           <div className="glass-panel rounded-3xl p-12 text-center text-slate-400">
             <GroupsIcon className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-            <p className="text-base font-medium">No members found matching your search.</p>
-            <p className="text-xs text-slate-500 mt-1">Try resetting the filter tabs or search query.</p>
+            <p className="text-base font-medium">{tr("No members found matching your search.")}</p>
+            <p className="text-xs text-slate-500 mt-1">{tr("Try resetting the filter tabs or search query.")}</p>
           </div>
         )}
       </div>

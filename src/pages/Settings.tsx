@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { api, store } from '../services/store';
 import type { GlobalState } from '../services/types';
@@ -10,16 +11,18 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import SaveIcon from '@mui/icons-material/Save';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 
-const fmt = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const Settings: React.FC = () => {
+  const { tr, fmt, translateError } = useLanguage();
   const [globalState, setGlobalState] = useState<GlobalState | null>(null);
   const [interestRate, setInterestRate] = useState('');
   const [rateSaved, setRateSaved] = useState(false);
   const [showDistribute, setShowDistribute] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [distributed, setDistributed] = useState(false);
+  const [interestApplied, setInterestApplied] = useState(false);
 
   const loadData = () => {
     const gs = api.getGlobalState();
@@ -60,7 +63,18 @@ export const Settings: React.FC = () => {
       setTimeout(() => setDistributed(false), 4000);
       loadData();
     } catch (e) {
-      alert((e as Error).message);
+      alert(translateError((e as Error).message));
+    }
+  };
+
+  const handleApplyMonthlyInterest = () => {
+    try {
+      api.applyMonthlyInterest();
+      setInterestApplied(true);
+      setTimeout(() => setInterestApplied(false), 4000);
+      loadData();
+    } catch (e) {
+      alert(translateError((e as Error).message));
     }
   };
 
@@ -74,12 +88,8 @@ export const Settings: React.FC = () => {
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Title */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
-          System Settings & Vault Control
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Configure default loan interest rate, manage fund distribution & system reset.
-        </p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">{tr("System Settings & Vault Control")}</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{tr("Configure default loan interest rate, manage fund distribution & system reset.")}</p>
       </div>
 
       {/* 1. Default Interest Rate Settings */}
@@ -89,8 +99,8 @@ export const Settings: React.FC = () => {
             <PercentIcon className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">Global Interest Rate</h3>
-            <p className="text-xs text-slate-400">Default APR percentage applied on new loan issues</p>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">{tr("Global Interest Rate")}</h3>
+            <p className="text-xs text-slate-400">{tr("Default APR percentage applied on new loan issues")}</p>
           </div>
         </div>
 
@@ -113,14 +123,14 @@ export const Settings: React.FC = () => {
             className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm transition-all flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/20"
           >
             <SaveIcon className="w-4 h-4" />
-            <span>Save Rate</span>
+            <span>{tr("Save Rate")}</span>
           </button>
         </div>
 
         {rateSaved && (
           <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium flex items-center space-x-2">
             <CheckCircleIcon className="w-4 h-4" />
-            <span>Default loan interest rate updated successfully!</span>
+            <span>{tr("Default loan interest rate updated successfully!")}</span>
           </div>
         )}
       </motion.div>
@@ -132,28 +142,28 @@ export const Settings: React.FC = () => {
             <AccountBalanceIcon className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">Fund Balance Overview</h3>
-            <p className="text-xs text-slate-400">Total capital, active loans out, and available liquidity</p>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">{tr("Fund Balance Overview")}</h3>
+            <p className="text-xs text-slate-400">{tr("Total capital, active loans out, and available liquidity")}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-center">
-            <p className="text-xs text-slate-400 uppercase font-mono">Total Capital</p>
+            <p className="text-xs text-slate-400 uppercase font-mono">{tr("Total Capital")}</p>
             <p className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">₹{fmt(totalDeposits)}</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">from share deposits</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">{tr("from share deposits")}</p>
           </div>
 
           <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-center">
-            <p className="text-xs text-slate-400 uppercase font-mono">Lent Out</p>
+            <p className="text-xs text-slate-400 uppercase font-mono">{tr("Lent Out")}</p>
             <p className="text-xl font-bold font-mono text-amber-400 mt-1">₹{fmt(totalLentOut)}</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">active principal loans</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">{tr("active principal loans")}</p>
           </div>
 
           <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-center">
-            <p className="text-xs text-slate-400 uppercase font-mono">Available Pool</p>
+            <p className="text-xs text-slate-400 uppercase font-mono">{tr("Available Pool")}</p>
             <p className="text-xl font-bold font-mono text-emerald-400 mt-1">₹{fmt(globalState.totalLendingPool)}</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">ready for lending</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">{tr("ready for lending")}</p>
           </div>
         </div>
       </motion.div>
@@ -165,19 +175,19 @@ export const Settings: React.FC = () => {
             <SavingsIcon className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">Interest Pool Distribution</h3>
-            <p className="text-xs text-slate-400">Distribute earned loan interest to share members</p>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">{tr("Interest Pool Distribution")}</h3>
+            <p className="text-xs text-slate-400">{tr("Distribute earned loan interest to share members")}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center">
-            <p className="text-xs text-slate-400 uppercase font-mono">Undistributed Interest Pool</p>
+            <p className="text-xs text-slate-400 uppercase font-mono">{tr("Undistributed Interest Pool")}</p>
             <p className="text-2xl font-extrabold font-mono text-emerald-400 mt-1">₹{fmt(globalState.totalInterestCollected)}</p>
           </div>
 
           <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-center">
-            <p className="text-xs text-slate-400 uppercase font-mono">All-Time Distributed</p>
+            <p className="text-xs text-slate-400 uppercase font-mono">{tr("All-Time Distributed")}</p>
             <p className="text-2xl font-extrabold font-mono text-slate-300 mt-1">₹{fmt(globalState.totalInterestDistributed)}</p>
           </div>
         </div>
@@ -192,39 +202,65 @@ export const Settings: React.FC = () => {
           }`}
         >
           <VolunteerActivismIcon className="w-5 h-5" />
-          <span>Distribute Interest to Share Members</span>
+          <span>{tr("Distribute Interest to Share Members")}</span>
         </button>
 
         {distributed && (
           <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium flex items-center space-x-2">
             <CheckCircleIcon className="w-4 h-4" />
-            <span>Interest distributed successfully across all share members!</span>
+            <span>{tr("Interest distributed successfully across all share members!")}</span>
           </div>
         )}
       </motion.div>
 
-      {/* 4. Danger Zone */}
+      {/* 4. Monthly Interest Calculation */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="glass-panel rounded-3xl p-6 space-y-4">
+        <div className="flex items-center space-x-3 pb-3 border-b border-slate-700/30 dark:border-white/10">
+          <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center">
+            <CalendarMonthIcon className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">{tr("Monthly Interest Calculation")}</h3>
+            <p className="text-xs text-slate-400">{tr("Calculate and apply interest to all active loans")}</p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleApplyMonthlyInterest}
+          className="w-full py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 text-white shadow-lg shadow-purple-500/25"
+        >
+          <CalendarMonthIcon className="w-5 h-5" />
+          <span>{tr("Apply Monthly Interest")}</span>
+        </button>
+
+        {interestApplied && (
+          <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium flex items-center space-x-2">
+            <CheckCircleIcon className="w-4 h-4" />
+            <span>{tr("Monthly interest applied successfully to all active loans!")}</span>
+          </div>
+        )}
+      </motion.div>
+
+      {/* 5. Danger Zone */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass-panel rounded-3xl p-6 space-y-4 border-rose-500/30">
         <div className="flex items-center space-x-3 pb-3 border-b border-rose-500/20">
           <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center">
             <WarningAmberIcon className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-rose-400">Danger Zone — Reset Database</h3>
-            <p className="text-xs text-slate-400">Wipe all members, transaction histories, and fund logs</p>
+            <h3 className="text-base font-bold text-rose-400">{tr("Danger Zone — Reset Database")}</h3>
+            <p className="text-xs text-slate-400">{tr("Wipe all members, transaction histories, and fund logs")}</p>
           </div>
         </div>
 
-        <p className="text-xs text-slate-400 leading-relaxed">
-          Permanently erases all cooperative data from local storage and restores empty system defaults. This action cannot be undone.
-        </p>
+        <p className="text-xs text-slate-400 leading-relaxed">{tr("Permanently erases all cooperative data from local storage and restores empty system defaults. This action cannot be undone.")}</p>
 
         <button
           onClick={() => setShowReset(true)}
           className="px-5 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 hover:bg-rose-600 text-rose-400 hover:text-white font-bold text-xs transition-all flex items-center space-x-2"
         >
           <DeleteForeverIcon className="w-4 h-4" />
-          <span>Reset All Data</span>
+          <span>{tr("Reset All Data")}</span>
         </button>
       </motion.div>
 
@@ -232,9 +268,9 @@ export const Settings: React.FC = () => {
       {showDistribute && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md p-4 flex items-center justify-center">
           <div className="glass-panel rounded-3xl p-6 max-w-lg w-full space-y-5 border border-white/20">
-            <h3 className="text-lg font-bold text-white">Preview Interest Distribution</h3>
+            <h3 className="text-lg font-bold text-white">{tr("Preview Interest Distribution")}</h3>
             <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
-              Distributing <strong className="font-mono text-emerald-400">₹{fmt(globalState.totalInterestCollected)}</strong> across {summary.length} share member(s) based on equity %.
+              {tr("Distributing ₹{amount} across {count} share member(s) based on equity %.", { amount: fmt(globalState.totalInterestCollected), count: summary.length })}
             </div>
 
             <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
@@ -242,7 +278,7 @@ export const Settings: React.FC = () => {
                 <div key={s.userId} className="p-3 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between text-xs">
                   <div>
                     <p className="font-semibold text-slate-200">{s.name}</p>
-                    <p className="text-slate-400 text-[10px]">{s.sharePercent.toFixed(1)}% Share</p>
+                    <p className="text-slate-400 text-[10px]">{s.sharePercent.toFixed(1)}{tr("% Share")}</p>
                   </div>
                   <p className="font-mono font-bold text-emerald-400">+₹{fmt(s.projectedAmount)}</p>
                 </div>
@@ -250,12 +286,8 @@ export const Settings: React.FC = () => {
             </div>
 
             <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10">
-              <button onClick={() => setShowDistribute(false)} className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white">
-                Cancel
-              </button>
-              <button onClick={handleDistribute} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20">
-                Confirm Distribution
-              </button>
+              <button onClick={() => setShowDistribute(false)} className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white">{tr("Cancel")}</button>
+              <button onClick={handleDistribute} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20">{tr("Confirm Distribution")}</button>
             </div>
           </div>
         </div>
@@ -265,18 +297,12 @@ export const Settings: React.FC = () => {
       {showReset && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md p-4 flex items-center justify-center">
           <div className="glass-panel rounded-3xl p-6 max-w-md w-full space-y-4 border border-rose-500/30">
-            <h3 className="text-lg font-bold text-rose-400">Confirm Reset Data</h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Are you sure you want to permanently delete all members, loans, transaction logs, and global vault balances?
-            </p>
+            <h3 className="text-lg font-bold text-rose-400">{tr("Confirm Reset Data")}</h3>
+            <p className="text-xs text-slate-300 leading-relaxed">{tr("Are you sure you want to permanently delete all members, loans, transaction logs, and global vault balances?")}</p>
 
             <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10">
-              <button onClick={() => setShowReset(false)} className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white">
-                Cancel
-              </button>
-              <button onClick={handleReset} className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-500/20">
-                Delete Everything
-              </button>
+              <button onClick={() => setShowReset(false)} className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white">{tr("Cancel")}</button>
+              <button onClick={handleReset} className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-500/20">{tr("Delete Everything")}</button>
             </div>
           </div>
         </div>

@@ -1,9 +1,9 @@
+import { useLanguage } from '../i18n/LanguageContext';
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, store } from '../services/store';
 import type { User, Transaction, Loan } from '../services/types';
 import { motion } from 'framer-motion';
-import { formatDistanceToNow } from 'date-fns';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PaymentIcon from '@mui/icons-material/Payment';
 import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
@@ -17,9 +17,9 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import CallReceivedIcon from '@mui/icons-material/CallReceived';
 import InfoIcon from '@mui/icons-material/Info';
 
-const fmt = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const UserDetails: React.FC = () => {
+  const { tr, fmt, formatDate, relativeTime, translateError, describeTransaction } = useLanguage();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -37,6 +37,7 @@ export const UserDetails: React.FC = () => {
   const [borrowAmount, setBorrowAmount] = useState('');
   const [borrowRate, setBorrowRate] = useState('');
   const [partialAmount, setPartialAmount] = useState('');
+  const [payInterest, setPayInterest] = useState(true);
 
   const loadData = useCallback(() => {
     if (id) {
@@ -78,7 +79,7 @@ export const UserDetails: React.FC = () => {
     const val = parseFloat(borrowAmount);
     const rate = parseFloat(borrowRate);
     if (!Number.isFinite(val) || val <= 0 || !Number.isFinite(rate) || rate < 0) {
-      alert('Please enter a valid loan amount and interest rate');
+      alert(tr("Please enter a valid loan amount and interest rate"));
       return;
     }
     try {
@@ -87,7 +88,7 @@ export const UserDetails: React.FC = () => {
       setBorrowAmount('');
       loadData();
     } catch (e) {
-      alert((e as Error).message);
+      alert(translateError((e as Error).message));
     }
   };
 
@@ -98,11 +99,15 @@ export const UserDetails: React.FC = () => {
         api.repayFull(user.id, repayLoan.id);
       } else if (repayMode === 'partial') {
         const val = parseFloat(partialAmount);
-        if (!Number.isFinite(val) || val <= 0 || val > repayLoan.outstandingPrincipal) {
-          alert('Enter a valid amount');
+        if (!Number.isFinite(val) || val < 0 || val > repayLoan.outstandingPrincipal) {
+          alert(tr("Enter a valid amount"));
           return;
         }
-        api.repayPartial(user.id, repayLoan.id, val);
+        if (val === 0 && !payInterest) {
+          alert(tr("Payment amount must be greater than 0"));
+          return;
+        }
+        api.repayPartial(user.id, repayLoan.id, val, payInterest);
       } else {
         api.payInterestOnly(user.id, repayLoan.id);
       }
@@ -110,7 +115,7 @@ export const UserDetails: React.FC = () => {
       setPartialAmount('');
       loadData();
     } catch (e) {
-      alert((e as Error).message);
+      alert(translateError((e as Error).message));
     }
   };
 
@@ -118,24 +123,25 @@ export const UserDetails: React.FC = () => {
     setRepayLoan(loan);
     setRepayMode(mode);
     setPartialAmount('');
+    setPayInterest(true);
   };
 
   const getTxBadge = (type: Transaction['type']) => {
     switch (type) {
       case 'deposit':
-        return { label: 'Share Deposit', bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: <ArrowDownwardIcon className="w-4 h-4" /> };
+        return { label: tr("Share Deposit"), bg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: <ArrowDownwardIcon className="w-4 h-4" /> };
       case 'borrow':
-        return { label: 'Loan Disbursed', bg: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: <ArrowUpwardIcon className="w-4 h-4" /> };
+        return { label: tr("Loan Disbursed"), bg: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: <ArrowUpwardIcon className="w-4 h-4" /> };
       case 'repay_full':
-        return { label: 'Full Loan Repayment', bg: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: <PaymentsIcon className="w-4 h-4" /> };
+        return { label: tr("Full Loan Repayment"), bg: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: <PaymentsIcon className="w-4 h-4" /> };
       case 'repay_partial':
-        return { label: 'Partial Loan Repayment', bg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', icon: <PaymentsIcon className="w-4 h-4" /> };
+        return { label: tr("Partial Loan Repayment"), bg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', icon: <PaymentsIcon className="w-4 h-4" /> };
       case 'interest_only':
-        return { label: 'Interest Only Paid', bg: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: <PercentIcon className="w-4 h-4" /> };
+        return { label: tr("Interest Only Paid"), bg: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: <PercentIcon className="w-4 h-4" /> };
       case 'withdraw':
-        return { label: 'Share Withdrawal', bg: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: <CallReceivedIcon className="w-4 h-4" /> };
+        return { label: tr("Share Withdrawal"), bg: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: <CallReceivedIcon className="w-4 h-4" /> };
       case 'interest_distribution':
-        return { label: 'Interest Distribution', bg: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20', icon: <StarIcon className="w-4 h-4" /> };
+        return { label: tr("Interest Distribution"), bg: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20', icon: <StarIcon className="w-4 h-4" /> };
       default:
         return { label: type, bg: 'bg-slate-500/10 text-slate-400 border-slate-500/20', icon: <AccountBalanceIcon className="w-4 h-4" /> };
     }
@@ -149,7 +155,7 @@ export const UserDetails: React.FC = () => {
         className="flex items-center space-x-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
       >
         <ArrowBackIcon className="w-4 h-4" />
-        <span>Back to Members Directory</span>
+        <span>{tr("Back to Members Directory")}</span>
       </button>
 
       {/* Member Header Card */}
@@ -176,7 +182,7 @@ export const UserDetails: React.FC = () => {
                     : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                 }`}
               >
-                {isShareMember ? 'Share Member' : 'Loan Borrower'}
+                {isShareMember ? tr("Share Member") : tr("Loan Borrower")}
               </span>
             </div>
 
@@ -188,7 +194,7 @@ export const UserDetails: React.FC = () => {
                 </span>
               )}
               {isShareMember && (
-                <span>Monthly Share Commitment: <strong className="font-mono text-slate-200">₹{user.monthlyShareAmount.toLocaleString()}</strong></span>
+                <span>{tr("Monthly Share Commitment:")} <strong className="font-mono text-slate-200">₹{fmt(user.monthlyShareAmount)}</strong></span>
               )}
             </div>
           </div>
@@ -202,7 +208,7 @@ export const UserDetails: React.FC = () => {
               className="flex-1 md:flex-none px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center space-x-2"
             >
               <PaymentIcon className="w-4 h-4" />
-              <span>Deposit Monthly Share</span>
+              <span>{tr("Deposit Monthly Share")}</span>
             </button>
           )}
           <button
@@ -210,7 +216,7 @@ export const UserDetails: React.FC = () => {
             className="flex-1 md:flex-none px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center space-x-2"
           >
             <RequestQuoteIcon className="w-4 h-4" />
-            <span>Issue Loan</span>
+            <span>{tr("Issue Loan")}</span>
           </button>
         </div>
       </motion.div>
@@ -220,33 +226,33 @@ export const UserDetails: React.FC = () => {
         {isShareMember && (
           <>
             <div className="glass-card rounded-3xl p-5">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Deposited</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Total Deposited")}</p>
               <p className="text-xl sm:text-2xl font-extrabold font-mono text-blue-400 mt-2">₹{fmt(user.totalDeposited)}</p>
             </div>
             <div className="glass-card rounded-3xl p-5">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Net Share Equity</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Net Share Equity")}</p>
               <p className="text-xl sm:text-2xl font-extrabold font-mono text-emerald-400 mt-2">₹{fmt(netEquity)}</p>
             </div>
             <div className="glass-card rounded-3xl p-5">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Share Equity %</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Share Equity %")}</p>
               <p className="text-xl sm:text-2xl font-extrabold font-mono text-indigo-400 mt-2">{sharePercent.toFixed(1)}%</p>
             </div>
             <div className="glass-card rounded-3xl p-5">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Interest Received</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Interest Received")}</p>
               <p className="text-xl sm:text-2xl font-extrabold font-mono text-yellow-400 mt-2">₹{fmt(user.interestEarned)}</p>
             </div>
           </>
         )}
 
         <div className={`glass-card rounded-3xl p-5 ${!isShareMember ? 'col-span-2' : ''}`}>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Loan Principal</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Active Loan Principal")}</p>
           <p className="text-xl sm:text-2xl font-extrabold font-mono text-rose-400 mt-2">₹{fmt(user.totalLent)}</p>
-          <p className="text-[11px] text-slate-500 mt-1">{activeLoans.length} active loan issue(s)</p>
+          <p className="text-[11px] text-slate-500 mt-1">{tr("{count} active loan issue(s)", { count: activeLoans.length })}</p>
         </div>
 
         {!isShareMember && (
           <div className="glass-card rounded-3xl p-5 col-span-2">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Interest Paid</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Total Interest Paid")}</p>
             <p className="text-xl sm:text-2xl font-extrabold font-mono text-amber-400 mt-2">
               ₹{fmt(allLoans.reduce((s, l) => s + l.totalInterestPaid, 0))}
             </p>
@@ -258,9 +264,9 @@ export const UserDetails: React.FC = () => {
       {activeLoans.length > 0 && (
         <section className="glass-panel rounded-3xl p-6 space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-700/30 dark:border-white/10">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Active Loan Outstanding</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">{tr("Active Loan Outstanding")}</h3>
             <span className="px-2.5 py-1 rounded-full text-[10px] font-mono bg-rose-500/10 text-rose-400 border border-rose-500/20">
-              {activeLoans.length} Active
+              {tr("{count} Active", { count: activeLoans.length })}
             </span>
           </div>
 
@@ -268,45 +274,49 @@ export const UserDetails: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-white/10 text-slate-400 uppercase tracking-wider">
-                  <th className="py-3 px-2">Issue Date</th>
-                  <th className="py-3 px-2">Original Principal</th>
-                  <th className="py-3 px-2">Outstanding Principal</th>
-                  <th className="py-3 px-2">Interest Rate</th>
-                  <th className="py-3 px-2">Interest Paid</th>
-                  <th className="py-3 px-2 text-right">Repayment Options</th>
+                  <th className="py-3 px-2">{tr("Issue Date")}</th>
+                  <th className="py-3 px-2">{tr("Original Principal")}</th>
+                  <th className="py-3 px-2">{tr("Outstanding Principal")}</th>
+                  <th className="py-3 px-2">{tr('Outstanding Interest')}</th>
+                  <th className="py-3 px-2">{tr("Interest Rate")}</th>
+                  <th className="py-3 px-2">{tr("Interest Paid")}</th>
+                  <th className="py-3 px-2 text-right">{tr("Repayment Options")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 font-mono">
                 {activeLoans.map((loan) => {
-                  const interestDue = loan.outstandingPrincipal * (loan.interestRatePercent / 100);
+                  const interestDue = loan.outstandingInterest;
                   return (
                     <tr key={loan.id} className="hover:bg-white/5 transition-colors">
                       <td className="py-3 px-2 text-slate-300">
-                        {new Date(loan.date).toLocaleDateString()}
+                        {formatDate(loan.date)}
                       </td>
                       <td className="py-3 px-2 text-slate-300">₹{fmt(loan.principalAmount)}</td>
                       <td className="py-3 px-2 font-bold text-rose-400">₹{fmt(loan.outstandingPrincipal)}</td>
+                      <td className="py-3 px-2 font-bold text-purple-400">₹{fmt(loan.outstandingInterest)}</td>
                       <td className="py-3 px-2 text-indigo-400">{loan.interestRatePercent}%</td>
                       <td className="py-3 px-2 text-emerald-400">₹{fmt(loan.totalInterestPaid)}</td>
                       <td className="py-3 px-2 text-right">
-                        <div className="flex items-center justify-end space-x-1.5 font-sans">
+                        <div className="grid grid-cols-3 gap-1.5 font-sans min-w-[280px] ml-auto">
                           <button
                             onClick={() => openRepayDialog(loan, 'full')}
-                            className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px]"
+                            className="w-full h-full flex flex-col items-center justify-center px-1 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] truncate leading-tight"
                           >
-                            Full (₹{fmt(loan.outstandingPrincipal + interestDue)})
+                            <span>{tr("Full Repayment")}</span>
+                            <span className="font-mono text-[10px] opacity-80 mt-0.5">₹{fmt(loan.outstandingPrincipal + interestDue)}</span>
                           </button>
                           <button
                             onClick={() => openRepayDialog(loan, 'partial')}
-                            className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-semibold text-[11px]"
+                            className="w-full h-full flex flex-col items-center justify-center px-1 py-1.5 rounded-xl bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/30 font-bold text-[11px] leading-tight"
                           >
-                            Partial
+                            <span>{tr("Partial")}</span>
                           </button>
                           <button
                             onClick={() => openRepayDialog(loan, 'interest')}
-                            className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 font-semibold text-[11px]"
+                            className="w-full h-full flex flex-col items-center justify-center px-1 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 font-bold text-[11px] truncate leading-tight"
                           >
-                            Interest (₹{fmt(interestDue)})
+                            <span>{tr("Interest Only")}</span>
+                            <span className="font-mono text-[10px] opacity-80 mt-0.5">₹{fmt(interestDue)}</span>
                           </button>
                         </div>
                       </td>
@@ -321,9 +331,7 @@ export const UserDetails: React.FC = () => {
 
       {/* Member Transaction Ledger Timeline */}
       <section className="glass-panel rounded-3xl p-6 space-y-4">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white pb-3 border-b border-slate-700/30 dark:border-white/10">
-          Member Transaction Timeline
-        </h3>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white pb-3 border-b border-slate-700/30 dark:border-white/10">{tr("Member Transaction Timeline")}</h3>
 
         <div className="space-y-3">
           {transactions.map((t) => {
@@ -342,7 +350,7 @@ export const UserDetails: React.FC = () => {
                     <div className="flex items-center space-x-2">
                       <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{badge.label}</p>
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5">{t.description}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{describeTransaction(t.description)}</p>
                   </div>
                 </div>
 
@@ -351,16 +359,14 @@ export const UserDetails: React.FC = () => {
                     {isNegative ? '-' : '+'}₹{fmt(t.amount)}
                   </p>
                   <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                    {formatDistanceToNow(new Date(t.date), { addSuffix: true })}
+                    {relativeTime(t.date)}
                   </p>
                 </div>
               </div>
             );
           })}
           {transactions.length === 0 && (
-            <div className="text-center py-8 text-slate-400 text-xs">
-              No transactions recorded for this member yet.
-            </div>
+            <div className="text-center py-8 text-slate-400 text-xs">{tr("No transactions recorded for this member yet.")}</div>
           )}
         </div>
       </section>
@@ -371,22 +377,18 @@ export const UserDetails: React.FC = () => {
       {openShare && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md p-4 flex items-center justify-center">
           <div className="glass-panel rounded-3xl p-6 max-w-md w-full space-y-4 border border-white/20">
-            <h3 className="text-lg font-bold text-white">Deposit Monthly Share Capital</h3>
+            <h3 className="text-lg font-bold text-white">{tr("Deposit Monthly Share Capital")}</h3>
             <p className="text-xs text-slate-300">
-              Deposit recurring share amount of <strong className="font-mono text-blue-400">₹{user.monthlyShareAmount.toLocaleString()}</strong> for {user.name}?
+              {tr("Deposit recurring share amount of ₹{amount} for {name}?", { amount: fmt(user.monthlyShareAmount), name: user.name })}
             </p>
             <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 flex items-start space-x-2">
               <InfoIcon className="w-4 h-4 shrink-0 text-blue-400 mt-0.5" />
-              <span>This deposit increases member share equity and adds liquidity to the lending pool.</span>
+              <span>{tr("This deposit increases member share equity and adds liquidity to the lending pool.")}</span>
             </div>
 
             <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10">
-              <button onClick={() => setOpenShare(false)} className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white">
-                Cancel
-              </button>
-              <button onClick={handleDepositShare} className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20">
-                Confirm Share Deposit
-              </button>
+              <button onClick={() => setOpenShare(false)} className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white">{tr("Cancel")}</button>
+              <button onClick={handleDepositShare} className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20">{tr("Confirm Share Deposit")}</button>
             </div>
           </div>
         </div>
@@ -396,13 +398,13 @@ export const UserDetails: React.FC = () => {
       {openBorrow && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md p-4 flex items-center justify-center">
           <div className="glass-panel rounded-3xl p-6 max-w-md w-full space-y-4 border border-white/20">
-            <h3 className="text-lg font-bold text-white">Issue Loan to {user.name}</h3>
+            <h3 className="text-lg font-bold text-white">{tr("Issue Loan to {name}", { name: user.name })}</h3>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Principal Amount (₹)</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{tr("Principal Amount (₹)")}</label>
               <input
                 type="number"
-                placeholder="e.g. 5000"
+                placeholder={tr("e.g. 5000")}
                 value={borrowAmount}
                 onChange={(e) => setBorrowAmount(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-2xl glass-input font-mono text-sm"
@@ -410,7 +412,7 @@ export const UserDetails: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Interest Rate (%)</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{tr("Interest Rate (%)")}</label>
               <input
                 type="number"
                 placeholder="3"
@@ -418,22 +420,17 @@ export const UserDetails: React.FC = () => {
                 onChange={(e) => setBorrowRate(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-2xl glass-input font-mono text-sm"
               />
-              <p className="text-[10px] text-slate-400 mt-1">Default rate: {api.getGlobalState().defaultInterestRatePercent}%</p>
+              <p className="text-[10px] text-slate-400 mt-1">{tr("Default rate:")} {api.getGlobalState().defaultInterestRatePercent}%</p>
             </div>
 
             {borrowAmount && parseFloat(borrowAmount) > 0 && borrowRate && (
-              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
-                Projected Interest: <strong className="font-mono text-emerald-400">₹{fmt(parseFloat(borrowAmount) * (parseFloat(borrowRate) / 100))}</strong> ({borrowRate}%)
+              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">{tr("Projected Interest:")}<strong className="font-mono text-emerald-400">₹{fmt(parseFloat(borrowAmount) * (parseFloat(borrowRate) / 100))}</strong> ({borrowRate}%)
               </div>
             )}
 
             <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10">
-              <button onClick={() => setOpenBorrow(false)} className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white">
-                Cancel
-              </button>
-              <button onClick={handleBorrow} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20">
-                Disburse Loan
-              </button>
+              <button onClick={() => setOpenBorrow(false)} className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white">{tr("Cancel")}</button>
+              <button onClick={handleBorrow} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20">{tr("Disburse Loan")}</button>
             </div>
           </div>
         </div>
@@ -444,53 +441,57 @@ export const UserDetails: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md p-4 flex items-center justify-center">
           <div className="glass-panel rounded-3xl p-6 max-w-md w-full space-y-4 border border-white/20">
             <h3 className="text-lg font-bold text-white">
-              {repayMode === 'full' ? 'Full Loan Repayment' : repayMode === 'partial' ? 'Partial Principal Repayment' : 'Interest Only Payment'}
+              {repayMode === 'full' ? tr("Full Loan Repayment") : repayMode === 'partial' ? tr("Partial Principal Repayment") : tr("Interest Only Payment")}
             </h3>
 
             <div className="p-3.5 rounded-2xl bg-white/5 border border-white/5 space-y-1 font-mono text-xs text-slate-300">
-              <p>Outstanding Principal: <strong className="text-rose-400">₹{fmt(repayLoan.outstandingPrincipal)}</strong></p>
-              <p>Interest Rate: <strong className="text-indigo-400">{repayLoan.interestRatePercent}%</strong></p>
-              <p>Interest Due: <strong className="text-purple-400">₹{fmt(repayLoan.outstandingPrincipal * (repayLoan.interestRatePercent / 100))}</strong></p>
+              <p>{tr("Outstanding Principal:")} <strong className="text-rose-400">₹{fmt(repayLoan.outstandingPrincipal)}</strong></p>
+              <p>{tr("Interest Rate:")} <strong className="text-indigo-400">{repayLoan.interestRatePercent}%</strong></p>
+              <p>{tr("Interest Due:")} <strong className="text-purple-400">₹{fmt(repayLoan.outstandingInterest)}</strong></p>
             </div>
 
             {repayMode === 'full' && (
-              <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
-                Total Payment: <strong className="font-mono text-emerald-400">₹{fmt(repayLoan.outstandingPrincipal + repayLoan.outstandingPrincipal * (repayLoan.interestRatePercent / 100))}</strong>
-                <p className="text-[10px] text-slate-400 mt-1">(₹{fmt(repayLoan.outstandingPrincipal)} Principal + ₹{fmt(repayLoan.outstandingPrincipal * (repayLoan.interestRatePercent / 100))} Interest)</p>
+              <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">{tr("Total Payment:")}<strong className="font-mono text-emerald-400">₹{fmt(repayLoan.outstandingPrincipal + repayLoan.outstandingInterest)}</strong>
+                <p className="text-[10px] text-slate-400 mt-1">{tr("(₹{principal} Principal + ₹{interest} Interest)", { principal: fmt(repayLoan.outstandingPrincipal), interest: fmt(repayLoan.outstandingInterest) })}</p>
               </div>
             )}
 
             {repayMode === 'partial' && (
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Principal Amount to Repay (₹)</label>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{tr("Principal Amount to Repay (₹)")}</label>
                 <input
                   type="number"
-                  placeholder={`Max ₹${fmt(repayLoan.outstandingPrincipal)}`}
+                  placeholder={tr("Max ₹{amount}", { amount: fmt(repayLoan.outstandingPrincipal) })}
                   value={partialAmount}
                   onChange={(e) => setPartialAmount(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl glass-input font-mono text-sm"
+                  className="w-full px-4 py-2.5 rounded-2xl glass-input font-mono text-sm mb-3"
                 />
-                {partialAmount && parseFloat(partialAmount) > 0 && (
-                  <p className="text-[11px] font-mono text-emerald-400 mt-1.5">
-                    Total: ₹{fmt(parseFloat(partialAmount) + parseFloat(partialAmount) * (repayLoan.interestRatePercent / 100))} (₹{fmt(parseFloat(partialAmount))} + ₹{fmt(parseFloat(partialAmount) * (repayLoan.interestRatePercent / 100))} Interest)
+                <label className="flex items-center space-x-2 text-sm text-slate-300 cursor-pointer">
+                  <input type="checkbox" checked={payInterest} onChange={(e) => setPayInterest(e.target.checked)} className="form-checkbox rounded bg-slate-900 border-white/20 text-blue-500" />
+                  <span>{tr("Pay outstanding interest (₹{amount})", { amount: fmt(repayLoan.outstandingInterest) })}</span>
+                </label>
+                
+                {(partialAmount || payInterest) && (
+                  <p className="text-[11px] font-mono text-emerald-400 mt-2 p-2 bg-emerald-500/10 rounded-xl">{tr("Total Payment: ₹")}{fmt((parseFloat(partialAmount) || 0) + (payInterest ? repayLoan.outstandingInterest : 0))}
+                    <br/>
+                    <span className="text-[10px] text-emerald-400/70">
+                      {tr("(₹{principal} Principal + ₹{interest} Interest)", { principal: fmt(parseFloat(partialAmount) || 0), interest: fmt(payInterest ? repayLoan.outstandingInterest : 0) })}
+                    </span>
                   </p>
                 )}
               </div>
             )}
 
             {repayMode === 'interest' && (
-              <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-300">
-                Interest Payment: <strong className="font-mono text-purple-300">₹{fmt(repayLoan.outstandingPrincipal * (repayLoan.interestRatePercent / 100))}</strong>
-                <p className="text-[10px] text-slate-400 mt-1">Principal remains unchanged at ₹{fmt(repayLoan.outstandingPrincipal)}.</p>
+              <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-300">{tr("Interest Payment:")}<strong className="font-mono text-purple-300">₹{fmt(repayLoan.outstandingInterest)}</strong>
+                <p className="text-[10px] text-slate-400 mt-1">{tr("Principal remains unchanged at ₹{amount}.", { amount: fmt(repayLoan.outstandingPrincipal) })}</p>
               </div>
             )}
 
             <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10">
-              <button onClick={() => setRepayLoan(null)} className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white">
-                Cancel
-              </button>
+              <button onClick={() => setRepayLoan(null)} className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white">{tr("Cancel")}</button>
               <button onClick={handleRepay} className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20">
-                {repayMode === 'full' ? 'Repay Full Amount' : repayMode === 'partial' ? 'Repay Partial Principal' : 'Pay Interest Only'}
+                {repayMode === 'full' ? tr("Repay Full Amount") : repayMode === 'partial' ? tr("Repay Partial Principal") : tr("Pay Interest Only")}
               </button>
             </div>
           </div>

@@ -1,3 +1,4 @@
+import { useLanguage } from '../i18n/LanguageContext';
 import React, { useState, useContext, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '@mui/material';
@@ -12,10 +13,12 @@ import Brightness7Icon from '@mui/icons-material/Brightness7';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import SecurityIcon from '@mui/icons-material/Security';
+import TranslateIcon from '@mui/icons-material/Translate';
 import { ColorModeContext } from '../App';
 import { store } from '../services/store';
 
 export const Layout: React.FC = () => {
+  const { tr, language, setLanguage, fmt } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -29,11 +32,11 @@ export const Layout: React.FC = () => {
   }, []);
 
   const navItems = [
-    { label: 'Dashboard', path: '/', icon: <DashboardIcon className="w-5 h-5" /> },
-    { label: 'Members', path: '/users', icon: <PeopleIcon className="w-5 h-5" /> },
-    { label: 'Add Member', path: '/add-user', icon: <PersonAddIcon className="w-5 h-5" /> },
-    { label: 'Fund Ledger', path: '/transactions', icon: <ReceiptLongIcon className="w-5 h-5" /> },
-    { label: 'Settings', path: '/settings', icon: <SettingsIcon className="w-5 h-5" /> },
+    { label: tr("Dashboard"), path: '/', icon: <DashboardIcon className="w-5 h-5" /> },
+    { label: tr("Members"), path: '/users', icon: <PeopleIcon className="w-5 h-5" /> },
+    { label: tr("Add Member"), path: '/add-user', icon: <PersonAddIcon className="w-5 h-5" /> },
+    { label: tr("Fund Ledger"), path: '/transactions', icon: <ReceiptLongIcon className="w-5 h-5" /> },
+    { label: tr("Settings"), path: '/settings', icon: <SettingsIcon className="w-5 h-5" /> },
   ];
 
   const activeNav = navItems.find(
@@ -100,11 +103,9 @@ export const Layout: React.FC = () => {
             {/* Quick Balance Preview Pill */}
             <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
               <div>
-                <p className="text-[11px] text-slate-400 uppercase font-mono tracking-wider">
-                  Lending Pool
-                </p>
+                <p className="text-[11px] text-slate-400 uppercase font-mono tracking-wider">{tr("Lending Pool")}</p>
                 <p className="text-sm font-bold font-mono text-emerald-400">
-                  ₹{appData.globalState.totalLendingPool.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹{fmt(appData.globalState.totalLendingPool)}
                 </p>
               </div>
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#34d399]" />
@@ -121,16 +122,16 @@ export const Layout: React.FC = () => {
                 ) : (
                   <Brightness4Icon className="w-4 h-4 text-indigo-400" />
                 )}
-                <span>{theme.palette.mode === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+                <span>{theme.palette.mode === 'dark' ? tr("Light Mode") : tr("Dark Mode")}</span>
               </span>
               <span className="text-[10px] font-mono uppercase bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
-                {theme.palette.mode}
+                {theme.palette.mode === 'dark' ? tr('Dark Mode') : tr('Light Mode')}
               </span>
             </button>
 
             <div className="flex items-center space-x-2 text-[11px] text-slate-500 px-1">
               <SecurityIcon className="w-3.5 h-3.5" />
-              <span>Encrypted Member Vault</span>
+              <span>{tr("Encrypted Member Vault")}</span>
             </div>
           </div>
         </div>
@@ -138,28 +139,40 @@ export const Layout: React.FC = () => {
 
       {/* TOP FLOATING HEADER (Mobile & Desktop) */}
       <header className="fixed top-0 left-0 right-0 md:left-72 z-30 p-4 md:p-5 pointer-events-none">
-        <div className="pointer-events-auto max-w-7xl mx-auto glass-panel rounded-2xl md:rounded-3xl px-5 py-3.5 flex items-center justify-between shadow-xl">
+        <div className="pointer-events-auto max-w-7xl mx-auto glass-panel rounded-2xl md:rounded-3xl px-3 sm:px-5 py-3.5 flex items-center justify-between gap-2 shadow-xl">
           {/* Title & Mobile Toggle */}
-          <div className="flex items-center space-x-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl bg-white/10 text-slate-200 hover:bg-white/20 transition-all"
-              aria-label="Toggle Navigation"
+              className="md:hidden shrink-0 p-2 rounded-xl bg-white/10 text-slate-700 dark:text-slate-200 hover:bg-white/20 transition-all"
+              aria-label={tr("Toggle Navigation")}
+              aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
             </button>
-            <h2 className="text-base md:text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              {activeNav?.label || 'Dashboard'}
+            <h2 className="truncate text-sm sm:text-base md:text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              {activeNav?.label || tr("Dashboard")}
             </h2>
           </div>
 
           {/* Quick Header Right Actions */}
-          <div className="flex items-center space-x-3">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => setLanguage(language === 'en' ? 'mr' : 'en')}
+              aria-label={tr(language === 'en' ? 'Switch to Marathi' : 'Switch to English')}
+              title={tr(language === 'en' ? 'Switch to Marathi' : 'Switch to English')}
+              className="flex min-h-10 items-center gap-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 px-2.5 py-2 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 transition-colors"
+            >
+              <TranslateIcon className="w-4 h-4" aria-hidden="true" />
+              <span lang={language === 'en' ? 'mr' : 'en'}>{language === 'en' ? 'मराठी' : 'English'}</span>
+            </button>
             {/* Dark Mode Button Header */}
             <button
               onClick={colorMode.toggleColorMode}
               className="p-2 rounded-xl bg-white/10 text-slate-700 dark:text-slate-200 hover:bg-white/20 transition-all flex items-center justify-center"
-              title="Toggle Light / Dark Mode"
+              title={tr("Toggle Light / Dark Mode")}
+              aria-label={tr("Toggle Light / Dark Mode")}
             >
               {theme.palette.mode === 'dark' ? (
                 <Brightness7Icon className="text-amber-300 w-5 h-5" />
@@ -171,7 +184,7 @@ export const Layout: React.FC = () => {
             {/* Quick Member Counter Badge */}
             <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs font-mono text-blue-400">
               <PeopleIcon className="w-4 h-4 text-blue-400" />
-              <span>{appData.users.length} Members</span>
+              <span>{appData.users.length} {tr("Members")}</span>
             </div>
           </div>
         </div>
@@ -185,10 +198,11 @@ export const Layout: React.FC = () => {
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-blue-500/30">
                 <AccountBalanceWalletIcon className="text-white w-6 h-6" />
               </div>
-              <span className="text-lg font-bold text-white tracking-wider">COOP BANK</span>
+              <span className="text-lg font-bold text-white tracking-wider">{tr("COOP BANK")}</span>
             </div>
             <button
               onClick={() => setMobileMenuOpen(false)}
+              aria-label={tr('Close Navigation')}
               className="p-2 rounded-full bg-white/10 text-white"
             >
               <CloseIcon />
@@ -225,7 +239,7 @@ export const Layout: React.FC = () => {
               className="w-full flex items-center justify-center space-x-2 py-3 rounded-2xl bg-white/10 text-white text-sm font-medium"
             >
               {theme.palette.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-              <span>Switch to {theme.palette.mode === 'dark' ? 'Light' : 'Dark'} Mode</span>
+              <span>{theme.palette.mode === 'dark' ? tr('Light Mode') : tr('Dark Mode')}</span>
             </button>
           </div>
         </div>
