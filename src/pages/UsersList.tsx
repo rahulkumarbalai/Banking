@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/store';
 import type { User } from '../services/types';
+import { getFixedSharePercent } from '../services/shares';
 import { motion } from 'framer-motion';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
@@ -22,10 +23,6 @@ export const UsersList: React.FC = () => {
   useEffect(() => {
     setUsers(api.getUsers());
   }, []);
-
-  const totalShareDeposits = users
-    .filter((u) => u.memberType === 'share')
-    .reduce((s, u) => s + u.totalDeposited - u.totalWithdrawn, 0);
 
   const filteredUsers = users.filter((u) => {
     const matchesSearch =
@@ -105,11 +102,7 @@ export const UsersList: React.FC = () => {
       {/* Members Cards / List */}
       <div className="space-y-3">
         {filteredUsers.map((user, index) => {
-          const netEquity = user.totalDeposited - user.totalWithdrawn;
-          const sharePercent =
-            totalShareDeposits > 0 && user.memberType === 'share'
-              ? (netEquity / totalShareDeposits) * 100
-              : 0;
+          const sharePercent = getFixedSharePercent(user, users);
           const isShareMember = user.memberType === 'share';
 
           return (
@@ -158,7 +151,7 @@ export const UsersList: React.FC = () => {
                     {isShareMember && (
                       <span className="flex items-center space-x-1">
                         <AccountBalanceIcon className="w-3.5 h-3.5" />
-                        <span>{tr("Equity: ₹")}{fmt(netEquity)}</span>
+                        <span>{tr("Monthly Share: ₹")}{fmt(user.monthlyShareAmount)}</span>
                       </span>
                     )}
                   </div>

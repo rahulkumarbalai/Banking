@@ -24,8 +24,9 @@ This repository contains a **Cooperative Fund Management System** built with Rea
 3. **Shares are returnable** — share members can withdraw equity not currently lent out
 4. **Interest rate** is configurable globally in Settings, and can be **overridden per loan** at borrow time
 5. **Repayment options**: Full (principal + interest), Partial (chosen principal + proportional interest), or Interest-only (no principal reduction)
-6. **Interest collected** goes to a separate pool, distributed manually to share-members proportionally by their share percentage
-7. **Every action is logged** as a Transaction with date, description, and full detail
+6. **Fixed share equity** is calculated from each share member's configured monthly share amount, so deposits and withdrawals do not change ownership percentage
+7. **Interest collected** goes to a separate pool and is distributed manually using the fixed share-equity percentage
+8. **Every action is logged** as a Transaction with date, description, and full detail
 
 ---
 

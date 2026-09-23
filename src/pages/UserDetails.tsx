@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, store } from '../services/store';
 import type { User, Transaction, Loan } from '../services/types';
+import { getFixedSharePercent } from '../services/shares';
 import { motion } from 'framer-motion';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PaymentIcon from '@mui/icons-material/Payment';
@@ -64,9 +65,7 @@ export const UserDetails: React.FC = () => {
 
   if (!user) return null;
 
-  const netEquity = user.totalDeposited - user.totalWithdrawn;
-  const totalShareDeposits = api.getTotalShareDeposits();
-  const sharePercent = totalShareDeposits > 0 ? (netEquity / totalShareDeposits) * 100 : 0;
+  const sharePercent = getFixedSharePercent(user, api.getUsers());
   const isShareMember = user.memberType === 'share';
 
   const handleDepositShare = () => {
@@ -230,8 +229,8 @@ export const UserDetails: React.FC = () => {
               <p className="text-xl sm:text-2xl font-extrabold font-mono text-blue-400 mt-2">₹{fmt(user.totalDeposited)}</p>
             </div>
             <div className="glass-card rounded-3xl p-5">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Net Share Equity")}</p>
-              <p className="text-xl sm:text-2xl font-extrabold font-mono text-emerald-400 mt-2">₹{fmt(netEquity)}</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Monthly Share Value")}</p>
+              <p className="text-xl sm:text-2xl font-extrabold font-mono text-emerald-400 mt-2">₹{fmt(user.monthlyShareAmount)}</p>
             </div>
             <div className="glass-card rounded-3xl p-5">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{tr("Share Equity %")}</p>
@@ -383,7 +382,7 @@ export const UserDetails: React.FC = () => {
             </p>
             <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 flex items-start space-x-2">
               <InfoIcon className="w-4 h-4 shrink-0 text-blue-400 mt-0.5" />
-              <span>{tr("This deposit increases member share equity and adds liquidity to the lending pool.")}</span>
+              <span>{tr("This deposit adds liquidity to the lending pool. It does not change the member's share equity.")}</span>
             </div>
 
             <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10">

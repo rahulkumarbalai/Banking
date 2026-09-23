@@ -2,6 +2,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import React, { useEffect, useState } from 'react';
 import { api, store } from '../services/store';
 import type { GlobalState, Transaction, User } from '../services/types';
+import { getFixedSharePercent } from '../services/shares';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
@@ -43,7 +44,7 @@ export const Dashboard: React.FC = () => {
   const shareMembers = users.filter((u) => u.memberType === 'share');
   const borrowerMembers = users.filter((u) => u.memberType === 'borrower');
   const topShareMembers = [...shareMembers]
-    .sort((a, b) => (b.totalDeposited - b.totalWithdrawn) - (a.totalDeposited - a.totalWithdrawn))
+    .sort((a, b) => b.monthlyShareAmount - a.monthlyShareAmount)
     .slice(0, 5);
   const totalShareDeposits = shareMembers.reduce((s, u) => s + u.totalDeposited - u.totalWithdrawn, 0);
   const totalLentOut = users.reduce((s, u) => s + u.totalLent, 0);
@@ -278,11 +279,7 @@ export const Dashboard: React.FC = () => {
 
             <div className="space-y-4 mt-5">
               {topShareMembers.map((user, i) => {
-                const netEquity = user.totalDeposited - user.totalWithdrawn;
-                const sharePercent =
-                  totalShareDeposits > 0 && user.memberType === 'share'
-                    ? (netEquity / totalShareDeposits) * 100
-                    : 0;
+                const sharePercent = getFixedSharePercent(user, users);
 
                 return (
                   <motion.div
@@ -320,7 +317,7 @@ export const Dashboard: React.FC = () => {
                             {sharePercent.toFixed(1)}%
                           </p>
                           <p className="text-[10px] text-slate-400 font-mono">
-                            ₹{fmt(netEquity)}
+                            {tr("Monthly Share: ₹")}{fmt(user.monthlyShareAmount)}
                           </p>
                         </div>
                       ) : (
@@ -342,7 +339,7 @@ export const Dashboard: React.FC = () => {
           {/* Quick Notice Card */}
           <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-900/30 to-indigo-900/30 border border-blue-500/20 text-xs text-blue-300">
             <p className="font-semibold text-blue-200">{tr("Year-End Distribution Rule:")}</p>
-            <p className="mt-1 text-slate-300 leading-relaxed text-[11px]">{tr("Loan interest pool is distributed proportionally to share members based on equity % at end of period.")}</p>
+            <p className="mt-1 text-slate-300 leading-relaxed text-[11px]">{tr("Loan interest is distributed by each member's fixed monthly share value, regardless of monthly payment status.")}</p>
           </div>
         </section>
       </div>

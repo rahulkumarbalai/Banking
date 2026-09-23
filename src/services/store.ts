@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { User, Loan, Transaction, GlobalState, AppData, MemberType } from './types';
+import { getFixedSharePercent, getTotalMonthlyShareValue } from './shares';
 
 const STORAGE_KEY = 'banking_app_data';
 
@@ -467,16 +468,15 @@ export const api = {
   // ---- Interest Distribution ----
   getInterestSummary: (): { userId: string; name: string; sharePercent: number; projectedAmount: number }[] => {
     const data = getData();
-    const totalShares = computeTotalShareDeposits(data);
+    const totalShares = getTotalMonthlyShareValue(data.users);
     const undistributed = data.globalState.totalInterestCollected;
 
     if (totalShares <= 0) return [];
 
     return data.users
-      .filter(u => u.memberType === 'share')
+      .filter(u => u.memberType === 'share' && u.monthlyShareAmount > 0)
       .map(u => {
-        const netShares = u.totalDeposited - u.totalWithdrawn;
-        const sharePercent = totalShares > 0 ? (netShares / totalShares) * 100 : 0;
+        const sharePercent = getFixedSharePercent(u, data.users);
         return {
           userId: u.id,
           name: u.name,
@@ -489,19 +489,18 @@ export const api = {
 
   distributeInterest: (): Transaction[] => {
     const data = getData();
-    const totalShares = computeTotalShareDeposits(data);
+    const totalShares = getTotalMonthlyShareValue(data.users);
     const undistributed = data.globalState.totalInterestCollected;
 
     if (undistributed <= 0) throw new Error('No interest to distribute');
-    if (totalShares <= 0) throw new Error('No share members with active deposits');
+    if (totalShares <= 0) throw new Error('No share members with configured shares');
 
     const transactions: Transaction[] = [];
-    const shareMembers = data.users.filter(u => u.memberType === 'share');
+    const shareMembers = data.users.filter(u => u.memberType === 'share' && u.monthlyShareAmount > 0);
 
     for (const user of shareMembers) {
       const userIndex = data.users.findIndex(u => u.id === user.id);
-      const netShares = user.totalDeposited - user.totalWithdrawn;
-      const sharePercent = (netShares / totalShares) * 100;
+      const sharePercent = getFixedSharePercent(user, data.users);
       const distributionAmount = undistributed * (sharePercent / 100);
 
       if (distributionAmount <= 0) continue;
@@ -530,6 +529,10 @@ export const api = {
   // ---- Utility ----
   getTotalShareDeposits: (): number => {
     return computeTotalShareDeposits(getData());
+  },
+
+  getTotalMonthlyShareValue: (): number => {
+    return getTotalMonthlyShareValue(getData().users);
   },
 
   resetAllData: (): void => {

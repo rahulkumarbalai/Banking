@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, store } from '../services/store';
 import type { Transaction, User } from '../services/types';
+import { buildMemberLedgerRows, createMemberLedgerWorkbook } from '../services/memberLedgerExport';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import SearchIcon from '@mui/icons-material/Search';
@@ -22,7 +23,7 @@ import CategoryIcon from '@mui/icons-material/Category';
 
 
 export const Transactions: React.FC = () => {
-  const { tr, fmt, formatDate, locale, transactionLabel, describeTransaction } = useLanguage();
+  const { tr, fmt, formatDate, language, describeTransaction } = useLanguage();
   const navigate = useNavigate();
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -33,6 +34,7 @@ export const Transactions: React.FC = () => {
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>('all'); // format: 'YYYY-MM' or 'all'
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'amount_desc'>('newest');
+  const [isExporting, setIsExporting] = useState(false);
 
   const loadData = () => {
     setAllTransactions(api.getTransactions());
@@ -150,44 +152,34 @@ export const Transactions: React.FC = () => {
     }
   };
 
-  const escapeCSV = (val: string | number | undefined | null): string => {
-    if (val === undefined || val === null) return '""';
-    let str = String(val);
-    if (/^[=+\-@]/.test(str)) {
-      str = "'" + str;
+  const exportUsers = selectedUser === 'all' ? users : users.filter((user) => user.id === selectedUser);
+
+  const handleExportExcel = async () => {
+    if (exportUsers.length === 0 || isExporting) return;
+
+    setIsExporting(true);
+    try {
+      const monthKey = selectedMonth === 'all' ? format(new Date(), 'yyyy-MM') : selectedMonth;
+      const rows = buildMemberLedgerRows({
+        users: exportUsers,
+        loans: api.getLoans(),
+        transactions: allTransactions,
+        monthKey,
+      });
+      const workbook = await createMemberLedgerWorkbook(rows, monthKey, language);
+      const downloadUrl = URL.createObjectURL(workbook);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `patil_bank_member_ledger_${monthKey}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    } catch {
+      alert(tr("Could not export Excel file"));
+    } finally {
+      setIsExporting(false);
     }
-    return `"${str.replace(/"/g, '""')}"`;
-  };
-
-  // Export CSV Handler
-  const handleExportCSV = () => {
-    if (filteredTransactions.length === 0) return;
-
-    const headers = [tr("Transaction ID"), tr("Date & Time"), tr("Member Name"), tr("Member Type"), tr("Action Type"), tr("Amount (INR)"), tr("Principal Paid"), tr("Interest Paid"), tr("Description")];
-    const rows = filteredTransactions.map((t) => {
-      const u = users.find((usr) => usr.id === t.userId);
-      return [
-        escapeCSV(t.id),
-        escapeCSV(t.date ? new Date(t.date).toLocaleString(locale) : ''),
-        escapeCSV(u?.name || tr("Unknown")),
-        escapeCSV(u ? tr(u.memberType === 'share' ? 'Share Member' : 'Borrower Only') : ''),
-        escapeCSV(transactionLabel(t.type)),
-        t.amount,
-        t.principalPaid || 0,
-        t.interestPaid || 0,
-        escapeCSV(describeTransaction(t.description || '')),
-      ];
-    });
-
-    const csvContent = '\uFEFF' + [headers.map(escapeCSV).join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }));
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `patil_bank_fund_ledger_${format(new Date(), 'yyyy-MM-dd')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(encodedUri), 1000);
   };
 
   const resetAllFilters = () => {
@@ -208,16 +200,16 @@ export const Transactions: React.FC = () => {
         </div>
 
         <button
-          onClick={handleExportCSV}
-          disabled={filteredTransactions.length === 0}
+          onClick={handleExportExcel}
+          disabled={exportUsers.length === 0 || isExporting}
           className={`flex items-center justify-center space-x-2 px-5 py-3 rounded-2xl font-bold text-xs sm:text-sm transition-all ${
-            filteredTransactions.length > 0
+            exportUsers.length > 0 && !isExporting
               ? 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white shadow-lg shadow-emerald-500/25'
               : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
           }`}
         >
           <DownloadIcon className="w-4 h-4" />
-          <span>{tr("Export CSV ({count})", { count: filteredTransactions.length })}</span>
+          <span>{isExporting ? tr("Preparing Excel...") : tr("Export Excel ({count})", { count: exportUsers.length })}</span>
         </button>
       </div>
 

@@ -270,7 +270,7 @@ export const Settings: React.FC = () => {
           <div className="glass-panel rounded-3xl p-6 max-w-lg w-full space-y-5 border border-white/20">
             <h3 className="text-lg font-bold text-white">{tr("Preview Interest Distribution")}</h3>
             <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
-              {tr("Distributing ₹{amount} across {count} share member(s) based on equity %.", { amount: fmt(globalState.totalInterestCollected), count: summary.length })}
+              {tr("Distributing ₹{amount} across {count} share member(s) based on fixed monthly share %.", { amount: fmt(globalState.totalInterestCollected), count: summary.length })}
             </div>
 
             <div className="max-h-60 overflow-y-auto space-y-2 pr-1">

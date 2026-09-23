@@ -9,8 +9,12 @@ const moduleURL = source => `data:text/javascript;base64,${Buffer.from(ts.transp
 }).outputText).toString('base64')}`;
 const messagesURL = moduleURL(readFileSync(new URL('../src/i18n/messages.ts', import.meta.url), 'utf8'));
 const coreURL = moduleURL(readFileSync(new URL('../src/i18n/core.ts', import.meta.url), 'utf8').replace("'./messages'", JSON.stringify(messagesURL)));
+const sharesURL = moduleURL(readFileSync(new URL('../src/services/shares.ts', import.meta.url), 'utf8'));
+const memberLedgerURL = moduleURL(readFileSync(new URL('../src/services/memberLedgerExport.ts', import.meta.url), 'utf8'));
 const { marathi } = await import(messagesURL);
 const { resolveLanguage, translate, translateError, transactionLabel, describeTransaction } = await import(coreURL);
+const { getFixedSharePercent, getTotalMonthlyShareValue } = await import(sharesURL);
+const { MEMBER_LEDGER_HEADERS, buildMemberLedgerRows, memberLedgerRowValues } = await import(memberLedgerURL);
 
 test('saved preference wins; invalid preferences use the browser language', () => {
   assert.equal(resolveLanguage('en', ['mr-IN']), 'en');
@@ -65,4 +69,45 @@ test('stored transaction descriptions translate without changing names or amount
     assert.equal(describeTransaction('en', entry), entry);
   }
   assert.equal(describeTransaction('mr', 'Custom note: paid by cheque'), 'Custom note: paid by cheque');
+});
+
+test('share equity is fixed by monthly share value, not deposits or payment status', () => {
+  const rahul = { id: '1', memberType: 'share', monthlyShareAmount: 500, totalDeposited: 500 };
+  const seema = { id: '2', memberType: 'share', monthlyShareAmount: 1500, totalDeposited: 6000 };
+  const borrower = { id: '3', memberType: 'borrower', monthlyShareAmount: 0, totalDeposited: 0 };
+  const members = [rahul, seema, borrower];
+
+  assert.equal(getTotalMonthlyShareValue(members), 2000);
+  assert.equal(getFixedSharePercent(rahul, members), 25);
+
+  rahul.totalDeposited += rahul.monthlyShareAmount;
+  assert.equal(getFixedSharePercent(rahul, members), 25, 'another monthly deposit must not change ownership');
+
+  const newMember = { id: '4', memberType: 'share', monthlyShareAmount: 500, totalDeposited: 0 };
+  assert.equal(getFixedSharePercent(rahul, [...members, newMember]), 20, 'a new configured share changes ownership');
+});
+
+test('member ledger export matches the 16-column reference table', () => {
+  assert.deepEqual(MEMBER_LEDGER_HEADERS.mr, [
+    'अ.क्र.', 'फंड धारकाचे नाव', 'शेअर्स', 'फंड जमा', 'व्याज जमा', 'मुद्दल जमा', 'दंड जमा',
+    'व्याजी रक्कम', 'फंड', 'महिने', 'फंड येणे रक्कम', 'एकूण व्याजी असलेली रक्कम',
+    'एकूण व्याज येणे बाकी', 'व्याज बाकी', 'दंड बाकी', 'एकूण जमा करावयाची रक्कम',
+  ]);
+
+  const rows = buildMemberLedgerRows({
+    monthKey: '2026-09',
+    users: [{ id: 'member-1', name: 'राहुल पाटील', memberType: 'share', monthlyShareAmount: 3000 }],
+    loans: [{ userId: 'member-1', outstandingPrincipal: 9500, totalInterestPaid: 100, outstandingInterest: 300 }],
+    transactions: [
+      { userId: 'member-1', type: 'deposit', amount: 3000, date: '2026-09-05T12:00:00' },
+      { userId: 'member-1', type: 'borrow', amount: 10000, date: '2026-09-06T12:00:00' },
+      { userId: 'member-1', type: 'repay_partial', amount: 600, principalPaid: 500, interestPaid: 100, date: '2026-09-10T12:00:00' },
+      { userId: 'member-1', type: 'deposit', amount: 3000, date: '2026-08-05T12:00:00' },
+    ],
+  });
+
+  assert.equal(rows.length, 1);
+  assert.deepEqual(memberLedgerRowValues(rows[0]), [
+    1, 'राहुल पाटील', 30, 3000, 100, 500, 0, 10000, 3000, 1, 3000, 9500, 400, 300, 0, 12800,
+  ]);
 });
