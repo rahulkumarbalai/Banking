@@ -1,6 +1,7 @@
 import { useLanguage } from '../i18n/LanguageContext';
 import React, { useState, useEffect } from 'react';
 import { api, store } from '../services/store';
+import type { MonthlyInterestResult } from '../services/store';
 import type { GlobalState } from '../services/types';
 import { motion } from 'framer-motion';
 import PercentIcon from '@mui/icons-material/Percent';
@@ -22,7 +23,7 @@ export const Settings: React.FC = () => {
   const [showDistribute, setShowDistribute] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [distributed, setDistributed] = useState(false);
-  const [interestApplied, setInterestApplied] = useState(false);
+  const [interestApplied, setInterestApplied] = useState<MonthlyInterestResult | null>(null);
 
   const loadData = () => {
     const gs = api.getGlobalState();
@@ -69,9 +70,9 @@ export const Settings: React.FC = () => {
 
   const handleApplyMonthlyInterest = () => {
     try {
-      api.applyMonthlyInterest();
-      setInterestApplied(true);
-      setTimeout(() => setInterestApplied(false), 4000);
+      const result = api.applyMonthlyInterest();
+      setInterestApplied(result);
+      setTimeout(() => setInterestApplied(null), 4000);
       loadData();
     } catch (e) {
       alert(translateError((e as Error).message));
@@ -100,7 +101,7 @@ export const Settings: React.FC = () => {
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">{tr("Global Interest Rate")}</h3>
-            <p className="text-xs text-slate-400">{tr("Default APR percentage applied on new loan issues")}</p>
+            <p className="text-xs text-slate-400">{tr("Default monthly interest percentage applied to new loans")}</p>
           </div>
         </div>
 
@@ -221,7 +222,7 @@ export const Settings: React.FC = () => {
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">{tr("Monthly Interest Calculation")}</h3>
-            <p className="text-xs text-slate-400">{tr("Calculate and apply interest to all active loans")}</p>
+            <p className="text-xs text-slate-400">{tr("Interest is added once for each completed loan month.")}</p>
           </div>
         </div>
 
@@ -230,13 +231,24 @@ export const Settings: React.FC = () => {
           className="w-full py-3.5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 text-white shadow-lg shadow-purple-500/25"
         >
           <CalendarMonthIcon className="w-5 h-5" />
-          <span>{tr("Apply Monthly Interest")}</span>
+          <span>{tr("Apply Due Interest")}</span>
         </button>
 
         {interestApplied && (
-          <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium flex items-center space-x-2">
-            <CheckCircleIcon className="w-4 h-4" />
-            <span>{tr("Monthly interest applied successfully to all active loans!")}</span>
+          <div className={'p-3.5 rounded-2xl border text-xs font-medium flex items-center space-x-2 ' + (
+            interestApplied.loansUpdated > 0
+              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+              : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+          )}>
+            {interestApplied.loansUpdated > 0 ? <CheckCircleIcon className="w-4 h-4" /> : <CalendarMonthIcon className="w-4 h-4" />}
+            <span>
+              {interestApplied.loansUpdated > 0
+                ? tr("Applied {months} completed month(s) across {loans} loan(s).", {
+                    months: interestApplied.monthsApplied,
+                    loans: interestApplied.loansUpdated,
+                  })
+                : tr("No loan has completed a new interest month.")}
+            </span>
           </div>
         )}
       </motion.div>

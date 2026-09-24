@@ -1,6 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { User, Loan, Transaction, GlobalState, AppData, MemberType } from './types';
 import { getFixedSharePercent, getTotalMonthlyShareValue } from './shares';
+import { hasMonthlyShareDeposit } from './monthlyShares';
+import { getLoanInterestAccrual, nextLoanMonthDate, normalizeIncompleteInterestAmount, roundCurrency } from './loanInterest';
 
 const STORAGE_KEY = 'banking_app_data';
 
@@ -23,15 +25,51 @@ const migrateData = (raw: unknown): AppData => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = raw as any;
 
-  // Ensure loans array exists and has new fields
+  // Preserve recorded balances while moving old loans onto the calendar-month schedule.
   if (!data.loans) {
     data.loans = [];
   } else {
-    data.loans = data.loans.map((l: any) => ({
-      ...l,
-      outstandingInterest: l.outstandingInterest || 0,
-      lastInterestAppliedDate: l.lastInterestAppliedDate || l.date,
-    }));
+    data.loans = data.loans.map((l: any) => {
+      let outstandingInterest = Number.isFinite(l.outstandingInterest) ? l.outstandingInterest : 0;
+      let lastInterestAppliedDate = l.lastInterestAppliedDate || l.date;
+
+      // The previous schema charged one month immediately when a loan was issued.
+      // Correct that recognizable case without touching ambiguous historical balances.
+      if (l.interestScheduleVersion !== 2) {
+        const issueDate = new Date(l.date);
+        const oldAppliedDate = new Date(lastInterestAppliedDate);
+        const initialCharge = roundCurrency(
+          Math.max(Number(l.principalAmount) || 0, 0) * (Math.max(Number(l.interestRatePercent) || 0, 0) / 100),
+        );
+        const looksLikeUntouchedInitialCharge =
+          Number(l.totalInterestPaid || 0) === 0 &&
+          Math.abs(outstandingInterest - initialCharge) < 0.01 &&
+          Number.isFinite(issueDate.getTime()) &&
+          Number.isFinite(oldAppliedDate.getTime()) &&
+          Math.abs(oldAppliedDate.getTime() - issueDate.getTime()) < 60_000;
+
+        if (looksLikeUntouchedInitialCharge) {
+          const firstDueDate = nextLoanMonthDate(issueDate, issueDate.getDate());
+          if (Date.now() < firstDueDate.getTime()) {
+            outstandingInterest = 0;
+            lastInterestAppliedDate = l.date;
+          } else {
+            lastInterestAppliedDate = firstDueDate.toISOString();
+          }
+        }
+      }
+
+      return {
+        ...l,
+        outstandingInterest,
+        lastInterestAppliedDate,
+        interestScheduleVersion: 2,
+        interestCycleDay:
+          Number.isInteger(l.interestCycleDay) && l.interestCycleDay >= 1 && l.interestCycleDay <= 31
+            ? l.interestCycleDay
+            : new Date(l.date).getDate(),
+      };
+    });
   }
 
   // Migrate globalState fields
@@ -109,6 +147,27 @@ const computeTotalShareDeposits = (data: AppData): number => {
     .reduce((sum, u) => sum + u.totalDeposited - u.totalWithdrawn, 0);
 };
 
+const prepareLoanInterest = (loan: Loan, paidAt: Date, incompleteInterestAmount = 0) => {
+  const accrual = getLoanInterestAccrual(loan, paidAt);
+  const incompleteInterest = normalizeIncompleteInterestAmount(
+    incompleteInterestAmount,
+    accrual.incompleteMonthMaximum,
+  );
+
+  loan.outstandingInterest = roundCurrency(accrual.totalCompletedInterestDue + incompleteInterest);
+  if (accrual.completedMonths > 0) {
+    loan.lastInterestAppliedDate = accrual.accruedThroughDate;
+  }
+
+  return { accrual, incompleteInterest };
+};
+
+export interface MonthlyInterestResult {
+  loansUpdated: number;
+  monthsApplied: number;
+  interestAdded: number;
+}
+
 // ---------------------------------------------------------------------------
 // API
 // ---------------------------------------------------------------------------
@@ -118,23 +177,25 @@ export const api = {
     return getData().globalState;
   },
 
-  applyMonthlyInterest: (): void => {
+  applyMonthlyInterest: (asOf: Date = new Date()): MonthlyInterestResult => {
     const data = getData();
-    const now = new Date().toISOString();
-    let updated = false;
+    const result: MonthlyInterestResult = { loansUpdated: 0, monthsApplied: 0, interestAdded: 0 };
 
     for (const loan of data.loans) {
-      if (loan.status === 'active') {
-        const interest = loan.outstandingPrincipal * (loan.interestRatePercent / 100);
-        loan.outstandingInterest += interest;
-        loan.lastInterestAppliedDate = now;
-        updated = true;
-      }
+      if (loan.status !== 'active') continue;
+
+      const accrual = getLoanInterestAccrual(loan, asOf);
+      if (accrual.completedMonths === 0) continue;
+
+      loan.outstandingInterest = accrual.totalCompletedInterestDue;
+      loan.lastInterestAppliedDate = accrual.accruedThroughDate;
+      result.loansUpdated += 1;
+      result.monthsApplied += accrual.completedMonths;
+      result.interestAdded = roundCurrency(result.interestAdded + accrual.newlyCompletedInterest);
     }
-    
-    if (updated) {
-      saveData(data);
-    }
+
+    if (result.loansUpdated > 0) saveData(data);
+    return result;
   },
 
   setDefaultInterestRate: (rate: number): GlobalState => {
@@ -189,6 +250,11 @@ export const api = {
       throw new Error('Only share members can deposit share capital');
     }
 
+    const depositedAt = new Date();
+    if (hasMonthlyShareDeposit(data.transactions, userId, depositedAt)) {
+      throw new Error('Monthly share already deposited for this month');
+    }
+
     user.totalDeposited += amount;
 
     // Shares become capital — increase lending pool
@@ -199,7 +265,7 @@ export const api = {
       userId,
       type: 'deposit',
       amount,
-      date: new Date().toISOString(),
+      date: depositedAt.toISOString(),
       description: `Monthly share deposit of ₹${fmt(amount)} by ${user.name}`,
     };
 
@@ -231,7 +297,7 @@ export const api = {
     data.globalState.totalLendingPool -= amount;
     user.totalLent += amount;
 
-    const initialInterest = amount * (rate / 100);
+    const issuedAt = new Date().toISOString();
 
     const loan: Loan = {
       id: uuidv4(),
@@ -240,9 +306,11 @@ export const api = {
       outstandingPrincipal: amount,
       interestRatePercent: rate,
       totalInterestPaid: 0,
-      outstandingInterest: initialInterest,
-      lastInterestAppliedDate: new Date().toISOString(),
-      date: new Date().toISOString(),
+      outstandingInterest: 0,
+      lastInterestAppliedDate: issuedAt,
+      interestScheduleVersion: 2,
+      interestCycleDay: new Date(issuedAt).getDate(),
+      date: issuedAt,
       status: 'active',
     };
     data.loans.push(loan);
@@ -253,7 +321,7 @@ export const api = {
       loanId: loan.id,
       type: 'borrow',
       amount,
-      date: new Date().toISOString(),
+      date: issuedAt,
       description: `Borrowed ₹${fmt(amount)} at ${rate}% interest`,
     };
 
@@ -263,7 +331,7 @@ export const api = {
   },
 
   // ---- Repayment: Full ----
-  repayFull: (userId: string, loanId: string): Transaction => {
+  repayFull: (userId: string, loanId: string, incompleteInterestAmount = 0): Transaction => {
     const data = getData();
     const userIndex = data.users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error('User not found');
@@ -274,21 +342,21 @@ export const api = {
     const loan = data.loans[loanIndex];
     if (loan.status === 'closed') throw new Error('Loan is already closed');
 
+    const paidAt = new Date();
+    const { accrual, incompleteInterest } = prepareLoanInterest(loan, paidAt, incompleteInterestAmount);
     const principal = loan.outstandingPrincipal;
     const interest = loan.outstandingInterest;
-    const totalPayment = principal + interest;
+    const totalPayment = roundCurrency(principal + interest);
 
-    // Update user
-    data.users[userIndex].totalLent -= principal;
+    data.users[userIndex].totalLent = Math.max(0, data.users[userIndex].totalLent - principal);
+    data.globalState.totalLendingPool = roundCurrency(data.globalState.totalLendingPool + principal);
+    data.globalState.totalInterestCollected = roundCurrency(data.globalState.totalInterestCollected + interest);
 
-    // Principal returns to pool, interest goes to interest pool
-    data.globalState.totalLendingPool += principal;
-    data.globalState.totalInterestCollected += interest;
-
-    // Close loan
     loan.outstandingPrincipal = 0;
     loan.outstandingInterest = 0;
-    loan.totalInterestPaid += interest;
+    loan.totalInterestPaid = roundCurrency(loan.totalInterestPaid + interest);
+    loan.lastInterestAppliedDate = paidAt.toISOString();
+    loan.interestCycleDay = paidAt.getDate();
     loan.status = 'closed';
 
     const transaction: Transaction = {
@@ -299,8 +367,16 @@ export const api = {
       amount: totalPayment,
       principalPaid: principal,
       interestPaid: interest,
-      date: new Date().toISOString(),
-      description: `Full repayment — ₹${fmt(principal)} principal + ₹${fmt(interest)} interest (${loan.interestRatePercent}%)`,
+      completedInterestMonthsApplied: accrual.completedMonths,
+      incompleteInterestCharged: incompleteInterest,
+      incompleteInterestWaived: accrual.hasIncompleteMonth
+        ? roundCurrency(accrual.incompleteMonthMaximum - incompleteInterest)
+        : 0,
+      date: paidAt.toISOString(),
+      description:
+        'Full repayment \u2014 \u20b9' + fmt(principal) +
+        ' principal + \u20b9' + fmt(interest) +
+        ' interest (' + loan.interestRatePercent + '%)',
     };
 
     data.transactions.push(transaction);
@@ -309,12 +385,21 @@ export const api = {
   },
 
   // ---- Repayment: Partial ----
-  repayPartial: (userId: string, loanId: string, principalAmount: number, payInterest: boolean): Transaction => {
+  repayPartial: (
+    userId: string,
+    loanId: string,
+    principalAmount: number,
+    payInterest: boolean,
+    incompleteInterestAmount = 0,
+  ): Transaction => {
     if (!Number.isFinite(principalAmount) || principalAmount < 0) {
       throw new Error('Invalid repayment amount');
     }
     if (principalAmount === 0 && !payInterest) {
       throw new Error('Payment amount must be greater than 0');
+    }
+    if (!payInterest && incompleteInterestAmount > 0) {
+      throw new Error('Incomplete month interest requires interest payment');
     }
 
     const data = getData();
@@ -328,33 +413,40 @@ export const api = {
     if (loan.status === 'closed') throw new Error('Loan is already closed');
     if (principalAmount > loan.outstandingPrincipal) throw new Error('Amount exceeds outstanding principal');
 
+    const paidAt = new Date();
+    const { accrual, incompleteInterest } = prepareLoanInterest(
+      loan,
+      paidAt,
+      payInterest ? incompleteInterestAmount : 0,
+    );
     const interest = payInterest ? loan.outstandingInterest : 0;
-    const totalPayment = principalAmount + interest;
+    const totalPayment = roundCurrency(principalAmount + interest);
 
     if (totalPayment <= 0) {
       throw new Error('Payment amount must be greater than 0');
     }
 
-    data.users[userIndex].totalLent -= principalAmount;
-    data.globalState.totalLendingPool += principalAmount;
-    data.globalState.totalInterestCollected += interest;
+    data.users[userIndex].totalLent = Math.max(0, data.users[userIndex].totalLent - principalAmount);
+    data.globalState.totalLendingPool = roundCurrency(data.globalState.totalLendingPool + principalAmount);
+    data.globalState.totalInterestCollected = roundCurrency(data.globalState.totalInterestCollected + interest);
 
-    loan.outstandingPrincipal -= principalAmount;
+    loan.outstandingPrincipal = roundCurrency(loan.outstandingPrincipal - principalAmount);
     if (payInterest) {
       loan.outstandingInterest = 0;
-      loan.totalInterestPaid += interest;
+      loan.totalInterestPaid = roundCurrency(loan.totalInterestPaid + interest);
+    }
+    if (accrual.hasIncompleteMonth) {
+      loan.lastInterestAppliedDate = paidAt.toISOString();
+      loan.interestCycleDay = paidAt.getDate();
     }
 
-    if (loan.outstandingPrincipal <= 0) {
-      loan.outstandingPrincipal = 0;
-      loan.status = 'closed';
-    }
+    loan.status = loan.outstandingPrincipal <= 0 && loan.outstandingInterest <= 0 ? 'closed' : 'active';
 
-    let description = `Partial repayment — ₹${fmt(principalAmount)} principal`;
-    if (payInterest) {
-      description += ` + ₹${fmt(interest)} outstanding interest`;
+    let description = 'Partial repayment \u2014 \u20b9' + fmt(principalAmount) + ' principal';
+    if (interest > 0) {
+      description += ' + \u20b9' + fmt(interest) + ' outstanding interest';
     }
-    description += `. Remaining Principal: ₹${fmt(loan.outstandingPrincipal)}`;
+    description += '. Remaining Principal: \u20b9' + fmt(loan.outstandingPrincipal);
 
     const transaction: Transaction = {
       id: uuidv4(),
@@ -364,7 +456,12 @@ export const api = {
       amount: totalPayment,
       principalPaid: principalAmount,
       interestPaid: interest,
-      date: new Date().toISOString(),
+      completedInterestMonthsApplied: accrual.completedMonths,
+      incompleteInterestCharged: incompleteInterest,
+      incompleteInterestWaived: accrual.hasIncompleteMonth
+        ? roundCurrency(accrual.incompleteMonthMaximum - incompleteInterest)
+        : 0,
+      date: paidAt.toISOString(),
       description,
     };
 
@@ -374,7 +471,7 @@ export const api = {
   },
 
   // ---- Repayment: Interest Only ----
-  payInterestOnly: (userId: string, loanId: string): Transaction => {
+  payInterestOnly: (userId: string, loanId: string, incompleteInterestAmount = 0): Transaction => {
     const data = getData();
     const userIndex = data.users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error('User not found');
@@ -385,12 +482,19 @@ export const api = {
     const loan = data.loans[loanIndex];
     if (loan.status === 'closed') throw new Error('Loan is already closed');
 
+    const paidAt = new Date();
+    const { accrual, incompleteInterest } = prepareLoanInterest(loan, paidAt, incompleteInterestAmount);
     const interest = loan.outstandingInterest;
     if (interest <= 0) throw new Error('No outstanding interest to pay');
 
-    data.globalState.totalInterestCollected += interest;
-    loan.totalInterestPaid += interest;
+    data.globalState.totalInterestCollected = roundCurrency(data.globalState.totalInterestCollected + interest);
+    loan.totalInterestPaid = roundCurrency(loan.totalInterestPaid + interest);
     loan.outstandingInterest = 0;
+    if (accrual.hasIncompleteMonth) {
+      loan.lastInterestAppliedDate = paidAt.toISOString();
+      loan.interestCycleDay = paidAt.getDate();
+    }
+    if (loan.outstandingPrincipal <= 0) loan.status = 'closed';
 
     const transaction: Transaction = {
       id: uuidv4(),
@@ -400,8 +504,16 @@ export const api = {
       amount: interest,
       interestPaid: interest,
       principalPaid: 0,
-      date: new Date().toISOString(),
-      description: `Interest-only payment of ₹${fmt(interest)} on ₹${fmt(loan.outstandingPrincipal)} outstanding (${loan.interestRatePercent}%)`,
+      completedInterestMonthsApplied: accrual.completedMonths,
+      incompleteInterestCharged: incompleteInterest,
+      incompleteInterestWaived: accrual.hasIncompleteMonth
+        ? roundCurrency(accrual.incompleteMonthMaximum - incompleteInterest)
+        : 0,
+      date: paidAt.toISOString(),
+      description:
+        'Interest-only payment of \u20b9' + fmt(interest) +
+        ' on \u20b9' + fmt(loan.outstandingPrincipal) +
+        ' outstanding (' + loan.interestRatePercent + '%)',
     };
 
     data.transactions.push(transaction);

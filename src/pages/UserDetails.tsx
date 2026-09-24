@@ -4,6 +4,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api, store } from '../services/store';
 import type { User, Transaction, Loan } from '../services/types';
 import { getFixedSharePercent } from '../services/shares';
+import { hasMonthlyShareDeposit } from '../services/monthlyShares';
+import { getLoanInterestAccrual } from '../services/loanInterest';
 import { motion } from 'framer-motion';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PaymentIcon from '@mui/icons-material/Payment';
@@ -17,6 +19,8 @@ import StarIcon from '@mui/icons-material/Star';
 import PhoneIcon from '@mui/icons-material/Phone';
 import CallReceivedIcon from '@mui/icons-material/CallReceived';
 import InfoIcon from '@mui/icons-material/Info';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 
 
 export const UserDetails: React.FC = () => {
@@ -39,6 +43,8 @@ export const UserDetails: React.FC = () => {
   const [borrowRate, setBorrowRate] = useState('');
   const [partialAmount, setPartialAmount] = useState('');
   const [payInterest, setPayInterest] = useState(true);
+  const [applyIncompleteInterest, setApplyIncompleteInterest] = useState(false);
+  const [incompleteInterestAmount, setIncompleteInterestAmount] = useState('0');
 
   const loadData = useCallback(() => {
     if (id) {
@@ -67,11 +73,24 @@ export const UserDetails: React.FC = () => {
 
   const sharePercent = getFixedSharePercent(user, api.getUsers());
   const isShareMember = user.memberType === 'share';
+  const sharePaidThisMonth = isShareMember && hasMonthlyShareDeposit(transactions, user.id);
+  const currentShareMonth = formatDate(new Date(), { month: 'long', year: 'numeric' });
+  const repaymentAccrual = repayLoan ? getLoanInterestAccrual(repayLoan) : null;
+  const selectedIncompleteInterest = applyIncompleteInterest
+    ? parseFloat(incompleteInterestAmount) || 0
+    : 0;
+  const selectedInterestDue = repaymentAccrual
+    ? repaymentAccrual.totalCompletedInterestDue + selectedIncompleteInterest
+    : 0;
 
   const handleDepositShare = () => {
-    api.depositShare(user.id, user.monthlyShareAmount);
-    setOpenShare(false);
-    loadData();
+    try {
+      api.depositShare(user.id, user.monthlyShareAmount);
+      setOpenShare(false);
+      loadData();
+    } catch (e) {
+      alert(translateError((e as Error).message));
+    }
   };
 
   const handleBorrow = () => {
@@ -94,8 +113,21 @@ export const UserDetails: React.FC = () => {
   const handleRepay = () => {
     if (!repayLoan) return;
     try {
+      if (
+        applyIncompleteInterest &&
+        (
+          !repaymentAccrual ||
+          !Number.isFinite(selectedIncompleteInterest) ||
+          selectedIncompleteInterest < 0 ||
+          selectedIncompleteInterest > repaymentAccrual.incompleteMonthMaximum
+        )
+      ) {
+        alert(tr("Enter a valid incomplete month interest amount"));
+        return;
+      }
+
       if (repayMode === 'full') {
-        api.repayFull(user.id, repayLoan.id);
+        api.repayFull(user.id, repayLoan.id, selectedIncompleteInterest);
       } else if (repayMode === 'partial') {
         const val = parseFloat(partialAmount);
         if (!Number.isFinite(val) || val < 0 || val > repayLoan.outstandingPrincipal) {
@@ -106,9 +138,9 @@ export const UserDetails: React.FC = () => {
           alert(tr("Payment amount must be greater than 0"));
           return;
         }
-        api.repayPartial(user.id, repayLoan.id, val, payInterest);
+        api.repayPartial(user.id, repayLoan.id, val, payInterest, payInterest ? selectedIncompleteInterest : 0);
       } else {
-        api.payInterestOnly(user.id, repayLoan.id);
+        api.payInterestOnly(user.id, repayLoan.id, selectedIncompleteInterest);
       }
       setRepayLoan(null);
       setPartialAmount('');
@@ -123,6 +155,9 @@ export const UserDetails: React.FC = () => {
     setRepayMode(mode);
     setPartialAmount('');
     setPayInterest(true);
+    setApplyIncompleteInterest(false);
+    const accrual = getLoanInterestAccrual(loan);
+    setIncompleteInterestAmount(String(accrual.incompleteMonthMaximum));
   };
 
   const getTxBadge = (type: Transaction['type']) => {
@@ -193,7 +228,19 @@ export const UserDetails: React.FC = () => {
                 </span>
               )}
               {isShareMember && (
-                <span>{tr("Monthly Share Commitment:")} <strong className="font-mono text-slate-200">₹{fmt(user.monthlyShareAmount)}</strong></span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>{tr("Monthly Share Commitment:")} <strong className="font-mono text-slate-200">{'\u20b9'}{fmt(user.monthlyShareAmount)}</strong></span>
+                  <span
+                    className={'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ' + (
+                      sharePaidThisMonth
+                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                        : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                    )}
+                  >
+                    {sharePaidThisMonth ? <CheckCircleIcon className="w-3 h-3" /> : <ScheduleIcon className="w-3 h-3" />}
+                    {sharePaidThisMonth ? tr("Share Paid This Month") : tr("Share Pending This Month")}
+                  </span>
+                </div>
               )}
             </div>
           </div>
@@ -203,11 +250,18 @@ export const UserDetails: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           {isShareMember && (
             <button
-              onClick={() => setOpenShare(true)}
-              className="flex-1 md:flex-none px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center space-x-2"
+              disabled={sharePaidThisMonth}
+              onClick={() => {
+                if (!sharePaidThisMonth) setOpenShare(true);
+              }}
+              className={'flex-1 md:flex-none px-5 py-3 rounded-2xl font-bold text-xs transition-all flex items-center justify-center space-x-2 ' + (
+                sharePaidThisMonth
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+              )}
             >
-              <PaymentIcon className="w-4 h-4" />
-              <span>{tr("Deposit Monthly Share")}</span>
+              {sharePaidThisMonth ? <CheckCircleIcon className="w-4 h-4" /> : <PaymentIcon className="w-4 h-4" />}
+              <span>{sharePaidThisMonth ? tr("Share Paid This Month") : tr("Deposit Monthly Share")}</span>
             </button>
           )}
           <button
@@ -284,7 +338,8 @@ export const UserDetails: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-white/5 font-mono">
                 {activeLoans.map((loan) => {
-                  const interestDue = loan.outstandingInterest;
+                  const interestAccrual = getLoanInterestAccrual(loan);
+                  const interestDue = interestAccrual.totalCompletedInterestDue;
                   return (
                     <tr key={loan.id} className="hover:bg-white/5 transition-colors">
                       <td className="py-3 px-2 text-slate-300">
@@ -292,7 +347,14 @@ export const UserDetails: React.FC = () => {
                       </td>
                       <td className="py-3 px-2 text-slate-300">₹{fmt(loan.principalAmount)}</td>
                       <td className="py-3 px-2 font-bold text-rose-400">₹{fmt(loan.outstandingPrincipal)}</td>
-                      <td className="py-3 px-2 font-bold text-purple-400">₹{fmt(loan.outstandingInterest)}</td>
+                      <td className="py-3 px-2 font-bold text-purple-400">
+                        <span>₹{fmt(interestDue)}</span>
+                        <span className="block font-sans text-[9px] font-medium text-slate-500 mt-0.5">
+                          {interestAccrual.completedMonths > 0
+                            ? tr("{count} completed month(s) ready", { count: interestAccrual.completedMonths })
+                            : tr("Next interest date: {date}", { date: formatDate(interestAccrual.nextInterestDate) })}
+                        </span>
+                      </td>
                       <td className="py-3 px-2 text-indigo-400">{loan.interestRatePercent}%</td>
                       <td className="py-3 px-2 text-emerald-400">₹{fmt(loan.totalInterestPaid)}</td>
                       <td className="py-3 px-2 text-right">
@@ -380,6 +442,9 @@ export const UserDetails: React.FC = () => {
             <p className="text-xs text-slate-300">
               {tr("Deposit recurring share amount of ₹{amount} for {name}?", { amount: fmt(user.monthlyShareAmount), name: user.name })}
             </p>
+            <p className="text-[11px] text-slate-400">
+              {tr("Share status for {month}", { month: currentShareMonth })}: <strong className="text-amber-300">{tr("Share Pending This Month")}</strong>
+            </p>
             <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 flex items-start space-x-2">
               <InfoIcon className="w-4 h-4 shrink-0 text-blue-400 mt-0.5" />
               <span>{tr("This deposit adds liquidity to the lending pool. It does not change the member's share equity.")}</span>
@@ -438,58 +503,145 @@ export const UserDetails: React.FC = () => {
       {/* Repay Loan Modal */}
       {repayLoan && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md p-4 flex items-center justify-center">
-          <div className="glass-panel rounded-3xl p-6 max-w-md w-full space-y-4 border border-white/20">
+          <div className="glass-panel rounded-3xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto space-y-4 border border-white/20">
             <h3 className="text-lg font-bold text-white">
               {repayMode === 'full' ? tr("Full Loan Repayment") : repayMode === 'partial' ? tr("Partial Principal Repayment") : tr("Interest Only Payment")}
             </h3>
 
-            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/5 space-y-1 font-mono text-xs text-slate-300">
-              <p>{tr("Outstanding Principal:")} <strong className="text-rose-400">₹{fmt(repayLoan.outstandingPrincipal)}</strong></p>
-              <p>{tr("Interest Rate:")} <strong className="text-indigo-400">{repayLoan.interestRatePercent}%</strong></p>
-              <p>{tr("Interest Due:")} <strong className="text-purple-400">₹{fmt(repayLoan.outstandingInterest)}</strong></p>
-            </div>
-
-            {repayMode === 'full' && (
-              <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">{tr("Total Payment:")}<strong className="font-mono text-emerald-400">₹{fmt(repayLoan.outstandingPrincipal + repayLoan.outstandingInterest)}</strong>
-                <p className="text-[10px] text-slate-400 mt-1">{tr("(₹{principal} Principal + ₹{interest} Interest)", { principal: fmt(repayLoan.outstandingPrincipal), interest: fmt(repayLoan.outstandingInterest) })}</p>
-              </div>
-            )}
-
-            {repayMode === 'partial' && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{tr("Principal Amount to Repay (₹)")}</label>
-                <input
-                  type="number"
-                  placeholder={tr("Max ₹{amount}", { amount: fmt(repayLoan.outstandingPrincipal) })}
-                  value={partialAmount}
-                  onChange={(e) => setPartialAmount(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-2xl glass-input font-mono text-sm mb-3"
-                />
-                <label className="flex items-center space-x-2 text-sm text-slate-300 cursor-pointer">
-                  <input type="checkbox" checked={payInterest} onChange={(e) => setPayInterest(e.target.checked)} className="form-checkbox rounded bg-slate-900 border-white/20 text-blue-500" />
-                  <span>{tr("Pay outstanding interest (₹{amount})", { amount: fmt(repayLoan.outstandingInterest) })}</span>
-                </label>
-                
-                {(partialAmount || payInterest) && (
-                  <p className="text-[11px] font-mono text-emerald-400 mt-2 p-2 bg-emerald-500/10 rounded-xl">{tr("Total Payment: ₹")}{fmt((parseFloat(partialAmount) || 0) + (payInterest ? repayLoan.outstandingInterest : 0))}
-                    <br/>
-                    <span className="text-[10px] text-emerald-400/70">
-                      {tr("(₹{principal} Principal + ₹{interest} Interest)", { principal: fmt(parseFloat(partialAmount) || 0), interest: fmt(payInterest ? repayLoan.outstandingInterest : 0) })}
-                    </span>
+            {repaymentAccrual && (
+              <>
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/5 space-y-1 font-mono text-xs text-slate-300">
+                  <p>{tr("Outstanding Principal:")} <strong className="text-rose-400">{'\u20b9'}{fmt(repayLoan.outstandingPrincipal)}</strong></p>
+                  <p>{tr("Interest Rate:")} <strong className="text-indigo-400">{repayLoan.interestRatePercent}%</strong></p>
+                  <p>{tr("Completed-month interest:")} <strong className="text-purple-400">{'\u20b9'}{fmt(repaymentAccrual.totalCompletedInterestDue)}</strong></p>
+                  <p className="font-sans text-[10px] text-slate-500">
+                    {repaymentAccrual.completedMonths > 0
+                      ? tr("{count} completed loan month(s)", { count: repaymentAccrual.completedMonths })
+                      : tr("No completed-month interest is due yet.")}
                   </p>
-                )}
-              </div>
-            )}
+                  <p className="font-sans text-[10px] text-slate-500">
+                    {tr("Next interest date: {date}", { date: formatDate(repaymentAccrual.nextInterestDate) })}
+                  </p>
+                </div>
 
-            {repayMode === 'interest' && (
-              <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-300">{tr("Interest Payment:")}<strong className="font-mono text-purple-300">₹{fmt(repayLoan.outstandingInterest)}</strong>
-                <p className="text-[10px] text-slate-400 mt-1">{tr("Principal remains unchanged at ₹{amount}.", { amount: fmt(repayLoan.outstandingPrincipal) })}</p>
-              </div>
+                {repaymentAccrual.hasIncompleteMonth && repaymentAccrual.incompleteMonthMaximum > 0 && (
+                  <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-3">
+                    <div className="flex items-start gap-2 text-amber-200">
+                      <ScheduleIcon className="w-4 h-4 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold">{tr("This loan month is not complete.")}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">{tr("One full month must be completed before interest is automatically due.")}</p>
+                      </div>
+                    </div>
+                    <label className={'flex items-center gap-2 text-xs ' + (
+                      repayMode === 'partial' && !payInterest ? 'text-slate-500 cursor-not-allowed' : 'text-slate-200 cursor-pointer'
+                    )}>
+                      <input
+                        type="checkbox"
+                        checked={applyIncompleteInterest && (repayMode !== 'partial' || payInterest)}
+                        disabled={repayMode === 'partial' && !payInterest}
+                        onChange={(e) => setApplyIncompleteInterest(e.target.checked)}
+                        className="form-checkbox rounded bg-slate-900 border-white/20 text-amber-500"
+                      />
+                      <span>{tr("Apply interest for the incomplete month")}</span>
+                    </label>
+                    {applyIncompleteInterest && (repayMode !== 'partial' || payInterest) && (
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                          {tr("Incomplete month interest amount (\u20b9)")}
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          max={repaymentAccrual.incompleteMonthMaximum}
+                          value={incompleteInterestAmount}
+                          onChange={(e) => setIncompleteInterestAmount(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-2xl glass-input font-mono text-sm"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          {tr("Set any amount from \u20b90 to \u20b9{amount}.", { amount: fmt(repaymentAccrual.incompleteMonthMaximum) })}
+                        </p>
+                      </div>
+                    )}
+                    {!applyIncompleteInterest && (
+                      <p className="text-[10px] text-slate-400">
+                        {tr("Leaving this off waives the incomplete month when this repayment is saved.")}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {repayMode === 'full' && (
+                  <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
+                    {tr("Total Payment:")} <strong className="font-mono text-emerald-400">{'\u20b9'}{fmt(repayLoan.outstandingPrincipal + selectedInterestDue)}</strong>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      {tr("(\u20b9{principal} Principal + \u20b9{interest} Interest)", {
+                        principal: fmt(repayLoan.outstandingPrincipal),
+                        interest: fmt(selectedInterestDue),
+                      })}
+                    </p>
+                  </div>
+                )}
+
+                {repayMode === 'partial' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{tr("Principal Amount to Repay (\u20b9)")}</label>
+                    <input
+                      type="number"
+                      placeholder={tr("Max \u20b9{amount}", { amount: fmt(repayLoan.outstandingPrincipal) })}
+                      value={partialAmount}
+                      onChange={(e) => setPartialAmount(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-2xl glass-input font-mono text-sm mb-3"
+                    />
+                    <label className="flex items-center space-x-2 text-sm text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={payInterest}
+                        onChange={(e) => {
+                          setPayInterest(e.target.checked);
+                          if (!e.target.checked) setApplyIncompleteInterest(false);
+                        }}
+                        className="form-checkbox rounded bg-slate-900 border-white/20 text-blue-500"
+                      />
+                      <span>{tr("Pay completed-month interest (\u20b9{amount})", { amount: fmt(repaymentAccrual.totalCompletedInterestDue) })}</span>
+                    </label>
+
+                    {(partialAmount || payInterest) && (
+                      <p className="text-[11px] font-mono text-emerald-400 mt-2 p-2 bg-emerald-500/10 rounded-xl">
+                        {tr("Total Payment: \u20b9")}{fmt((parseFloat(partialAmount) || 0) + (payInterest ? selectedInterestDue : 0))}
+                        <br />
+                        <span className="text-[10px] text-emerald-400/70">
+                          {tr("(\u20b9{principal} Principal + \u20b9{interest} Interest)", {
+                            principal: fmt(parseFloat(partialAmount) || 0),
+                            interest: fmt(payInterest ? selectedInterestDue : 0),
+                          })}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {repayMode === 'interest' && (
+                  <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-300">
+                    {tr("Interest Payment:")} <strong className="font-mono text-purple-300">{'\u20b9'}{fmt(selectedInterestDue)}</strong>
+                    <p className="text-[10px] text-slate-400 mt-1">{tr("Principal remains unchanged at \u20b9{amount}.", { amount: fmt(repayLoan.outstandingPrincipal) })}</p>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10">
               <button onClick={() => setRepayLoan(null)} className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white">{tr("Cancel")}</button>
-              <button onClick={handleRepay} className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20">
+              <button
+                disabled={repayMode === 'interest' && selectedInterestDue <= 0}
+                onClick={handleRepay}
+                className={'px-5 py-2.5 rounded-xl font-bold text-xs ' + (
+                  repayMode === 'interest' && selectedInterestDue <= 0
+                    ? 'bg-white/5 text-slate-500 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                )}
+              >
                 {repayMode === 'full' ? tr("Repay Full Amount") : repayMode === 'partial' ? tr("Repay Partial Principal") : tr("Pay Interest Only")}
               </button>
             </div>

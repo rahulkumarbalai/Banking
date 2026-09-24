@@ -20,13 +20,13 @@ This repository contains a **Cooperative Fund Management System** built with Rea
 
 ## Business Rules
 1. **Capital = sum of member share deposits** — no manual capital injection
-2. **Two member types**: `share` (pays monthly shares, can borrow, receives interest distributions) and `borrower` (borrow-only, no shares)
+2. **Two member types**: share members pay one fixed deposit per calendar month, can borrow, and receive interest distributions; borrower members have loans only
 3. **Shares are returnable** — share members can withdraw equity not currently lent out
-4. **Interest rate** is configurable globally in Settings, and can be **overridden per loan** at borrow time
-5. **Repayment options**: Full (principal + interest), Partial (chosen principal + proportional interest), or Interest-only (no principal reduction)
+4. **Monthly interest rate** is configurable globally in Settings and can be overridden per loan; interest becomes due only after each full loan month
+5. **Repayment options**: Full, Partial, or Interest-only. Staff can waive or enter a reduced charge for the current incomplete month
 6. **Fixed share equity** is calculated from each share member's configured monthly share amount, so deposits and withdrawals do not change ownership percentage
 7. **Interest collected** goes to a separate pool and is distributed manually using the fixed share-equity percentage
-8. **Every action is logged** as a Transaction with date, description, and full detail
+8. **Every money movement is logged** with its date, description, and repayment interest details
 
 ---
 
@@ -61,7 +61,7 @@ Banking/
 ## Key Data Models (`src/services/types.ts`)
 - **`MemberType`**: `'share'` | `'borrower'`
 - **`User`**: `id`, `name`, `mobile`, `memberType`, `monthlyShareAmount`, `totalDeposited`, `totalLent`, `totalWithdrawn`, `interestEarned`
-- **`Loan`**: `id`, `userId`, `principalAmount`, `outstandingPrincipal`, `interestRatePercent`, `totalInterestPaid`, `date`, `status`
+- **Loan**: identifiers, original and outstanding principal, monthly rate, paid and outstanding interest, calendar-month schedule, issue date, and status
 - **`Transaction`**: `id`, `userId`, `loanId?`, `type`, `amount`, `date`, `description`, `interestPaid?`, `principalPaid?`
   - Types: `deposit`, `borrow`, `repay_full`, `repay_partial`, `interest_only`, `withdraw`, `interest_distribution`
 - **`GlobalState`**: `totalLendingPool`, `totalInterestCollected`, `totalInterestDistributed`, `defaultInterestRatePercent`

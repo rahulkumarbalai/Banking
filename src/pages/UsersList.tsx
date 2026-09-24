@@ -1,9 +1,10 @@
 import { useLanguage } from '../i18n/LanguageContext';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../services/store';
-import type { User } from '../services/types';
+import { api, store } from '../services/store';
+import type { User, Transaction } from '../services/types';
 import { getFixedSharePercent } from '../services/shares';
+import { getPendingShareMembers, hasMonthlyShareDeposit } from '../services/monthlyShares';
 import { motion } from 'framer-motion';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
@@ -11,24 +12,38 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import GroupsIcon from '@mui/icons-material/Groups';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 
 
 export const UsersList: React.FC = () => {
-  const { tr, fmt } = useLanguage();
+  const { tr, fmt, formatDate } = useLanguage();
   const [users, setUsers] = useState<User[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'share' | 'borrower'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'share' | 'borrower' | 'pending'>('all');
   const navigate = useNavigate();
 
   useEffect(() => {
-    setUsers(api.getUsers());
+    const loadData = () => {
+      setUsers(api.getUsers());
+      setTransactions(api.getTransactions());
+    };
+    loadData();
+    return store.subscribe(loadData);
   }, []);
+
+  const pendingShareMembers = getPendingShareMembers(users, transactions);
+  const pendingMemberIds = new Set(pendingShareMembers.map((member) => member.id));
+  const currentMonth = formatDate(new Date(), { month: 'long', year: 'numeric' });
 
   const filteredUsers = users.filter((u) => {
     const matchesSearch =
       u.name.toLowerCase().includes(search.toLowerCase()) ||
       (u.mobile && u.mobile.includes(search));
-    const matchesFilter = filterType === 'all' || u.memberType === filterType;
+    const matchesFilter =
+      filterType === 'all' ||
+      (filterType === 'pending' ? pendingMemberIds.has(u.id) : u.memberType === filterType);
     return matchesSearch && matchesFilter;
   });
 
@@ -65,7 +80,7 @@ export const UsersList: React.FC = () => {
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex items-center p-1 rounded-2xl bg-white/5 border border-white/10 w-full md:w-auto">
+        <div className="flex flex-wrap items-center p-1 rounded-2xl bg-white/5 border border-white/10 w-full md:w-auto">
           <button
             onClick={() => setFilterType('all')}
             className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
@@ -96,6 +111,16 @@ export const UsersList: React.FC = () => {
           >
             {tr("Borrowers Only ({count})", { count: users.filter((u) => u.memberType === 'borrower').length })}
           </button>
+          <button
+            onClick={() => setFilterType('pending')}
+            className={'flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-semibold transition-all ' + (
+              filterType === 'pending'
+                ? 'bg-amber-500 text-slate-950 shadow-md'
+                : 'text-amber-300 hover:text-amber-200'
+            )}
+          >
+            {tr("Pending Shares ({count})", { count: pendingShareMembers.length })}
+          </button>
         </div>
       </div>
 
@@ -104,6 +129,7 @@ export const UsersList: React.FC = () => {
         {filteredUsers.map((user, index) => {
           const sharePercent = getFixedSharePercent(user, users);
           const isShareMember = user.memberType === 'share';
+          const sharePaidThisMonth = isShareMember && hasMonthlyShareDeposit(transactions, user.id);
 
           return (
             <motion.div
@@ -126,7 +152,7 @@ export const UsersList: React.FC = () => {
                   {user.name.charAt(0)}
                 </div>
                 <div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-blue-400 transition-colors">
                       {user.name}
                     </h3>
@@ -139,6 +165,19 @@ export const UsersList: React.FC = () => {
                     >
                       {isShareMember ? tr("Share Member") : tr("Loan Borrower")}
                     </span>
+                    {isShareMember && (
+                      <span
+                        title={tr("Share status for {month}", { month: currentMonth })}
+                        className={'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ' + (
+                          sharePaidThisMonth
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                        )}
+                      >
+                        {sharePaidThisMonth ? <CheckCircleIcon className="w-3 h-3" /> : <ScheduleIcon className="w-3 h-3" />}
+                        {sharePaidThisMonth ? tr("Share Paid This Month") : tr("Share Pending This Month")}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center space-x-3 text-xs text-slate-400 mt-1">
@@ -160,7 +199,7 @@ export const UsersList: React.FC = () => {
 
               {/* Financial Metrics & Arrow */}
               <div className="flex items-center justify-between sm:justify-end space-x-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-700/30 dark:border-white/10">
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {isShareMember && sharePercent > 0 && (
                     <div className="px-3 py-1 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 font-mono text-xs font-semibold">
                       {sharePercent.toFixed(1)}{tr("% Share")}</div>

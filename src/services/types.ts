@@ -20,7 +20,9 @@ export interface Loan {
   interestRatePercent: number; // per-loan interest rate (set at borrow time)
   totalInterestPaid: number; // interest paid so far on this loan
   outstandingInterest: number; // accumulated interest not yet paid
-  lastInterestAppliedDate?: string; // date when interest was last calculated
+  lastInterestAppliedDate?: string; // completed-interest boundary or repayment cycle reset
+  interestScheduleVersion?: 2; // calendar-month accrual rules
+  interestCycleDay?: number; // due-date day, reset after an incomplete-period repayment
   date: string; // date loan was issued
   status: 'active' | 'closed';
 }
@@ -42,6 +44,9 @@ export interface Transaction {
   description: string; // human-readable log entry
   interestPaid?: number;
   principalPaid?: number;
+  completedInterestMonthsApplied?: number;
+  incompleteInterestCharged?: number;
+  incompleteInterestWaived?: number;
 }
 
 export interface GlobalState {
